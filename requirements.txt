@@ -24,3 +24,4 @@ langchain-openai
 openai
 aiogram
 plotly>=5.18.0
+openpyxl>=3.1.0
