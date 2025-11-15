@@ -10,9 +10,11 @@ from django.conf import settings
 from typing import Dict, Any, Optional
 import time
 import logging
+import pandas as pd
 
 from .models import SQLDatabaseConnection, SQLToolExecution, OpenAIMCPRequest
 from .utils import is_openai_configured
+from .visualization import VisualizationGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -98,11 +100,39 @@ class SQLAIAgent:
             # Extract SQL query from agent's intermediate steps if available
             sql_query = self._extract_sql_query(result)
 
+            # Generate visualization if applicable
+            visualization = None
+            if sql_query:  # Only if we have SQL query
+                try:
+                    logger.info(f"Attempting to generate visualization for SQL: {sql_query[:100]}...")
+                    # Execute SQL to get DataFrame for visualization
+                    df = self._execute_sql_to_dataframe(sql_query)
+
+                    if df is not None and not df.empty:
+                        logger.info(f"DataFrame created with {len(df)} rows, {len(df.columns)} columns")
+                        viz_generator = VisualizationGenerator()
+                        visualization = viz_generator.generate_visualization(
+                            df=df,
+                            query=user_query,
+                            sql_query=sql_query,
+                            config={}
+                        )
+                        if visualization:
+                            logger.info(f"Visualization generated: {visualization['chart_type']}")
+                        else:
+                            logger.info("Visualization generator returned None (not suitable for viz)")
+                    else:
+                        logger.info(f"DataFrame is empty or None, skipping visualization")
+                except Exception as e:
+                    logger.error(f"Error generating visualization: {e}", exc_info=True)
+                    # Continue without visualization - text response is more important
+
             # Update tool execution
             tool_execution.tool_output = {
                 "user_query": user_query,
                 "result": result.get("output", ""),
                 "intermediate_steps": str(result.get("intermediate_steps", []))[:1000],
+                "visualization_generated": visualization is not None,
             }
             tool_execution.sql_query = sql_query
             tool_execution.query_result = {"output": result.get("output", "")}
@@ -110,7 +140,7 @@ class SQLAIAgent:
             tool_execution.execution_time_ms = execution_time
             tool_execution.save()
 
-            return {
+            response = {
                 "success": True,
                 "user_query": user_query,
                 "sql_query": sql_query,
@@ -118,6 +148,12 @@ class SQLAIAgent:
                 "execution_time_ms": execution_time,
                 "tool_execution_id": tool_execution.id,
             }
+            
+            # Add visualization if available
+            if visualization:
+                response["visualization"] = visualization
+
+            return response
 
         except Exception as e:
             execution_time = int((time.time() - start_time) * 1000)
@@ -150,19 +186,61 @@ class SQLAIAgent:
         try:
             # Try to extract from intermediate steps
             intermediate_steps = result.get("intermediate_steps", [])
+
+            # Look for the actual data query (usually sql_db_query tool)
+            # We want the last SELECT query, not schema/list queries
+            sql_queries = []
+
             for step in intermediate_steps:
                 if len(step) >= 2:
                     action = step[0]
-                    if hasattr(action, "tool_input"):
-                        tool_input = action.tool_input
-                        if isinstance(tool_input, dict) and "query" in tool_input:
-                            return tool_input["query"]
-                        elif isinstance(tool_input, str):
-                            # Sometimes it's just a string SQL query
-                            return tool_input
+                    if hasattr(action, "tool"):
+                        tool_name = action.tool
+                        # We only want actual data queries, not schema/list
+                        if tool_name == "sql_db_query":
+                            if hasattr(action, "tool_input"):
+                                tool_input = action.tool_input
+                                if isinstance(tool_input, dict) and "query" in tool_input:
+                                    query = tool_input["query"]
+                                    # Only collect SELECT queries
+                                    if query.strip().upper().startswith("SELECT"):
+                                        sql_queries.append(query)
+                                elif isinstance(tool_input, str):
+                                    if tool_input.strip().upper().startswith("SELECT"):
+                                        sql_queries.append(tool_input)
+
+            # Return the last SELECT query (the actual data query)
+            if sql_queries:
+                logger.info(f"Extracted SQL query: {sql_queries[-1][:100]}...")
+                return sql_queries[-1]
+
+            logger.info("No SELECT query found in intermediate steps")
             return None
         except Exception as e:
-            logger.warning(f"Could not extract SQL query: {e}")
+            logger.error(f"Error extracting SQL query: {e}", exc_info=True)
+            return None
+
+    def _execute_sql_to_dataframe(self, sql_query: str) -> Optional[pd.DataFrame]:
+        """
+        Execute SQL query and return results as DataFrame
+        
+        Args:
+            sql_query: SQL query string
+            
+        Returns:
+            DataFrame with query results or None if error
+        """
+        try:
+            if not sql_query or not sql_query.strip():
+                return None
+            
+            # Use the database connection to execute SQL
+            # SQLDatabase has a run method that returns string, but we need DataFrame
+            # So we use pandas.read_sql directly with the database URI
+            return pd.read_sql(sql_query, self.connection.database_uri)
+            
+        except Exception as e:
+            logger.warning(f"Could not execute SQL to DataFrame: {e}")
             return None
 
 

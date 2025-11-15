@@ -1,120 +1,187 @@
-import { useState, useEffect } from 'react';
-import { useTelegramContext } from './telegram/TelegramProvider';
-import { telegramApi } from './api/telegram';
-import type { QueryResponse, HistoryItem } from './api/telegram';
+/**
+ * AI SQL Chatbot - Main Application
+ * Provides natural language interface to query databases
+ */
+import { useState, useEffect, useRef } from 'react';
+import { aiChatbotApi, type Message } from './api/ai-chatbot';
+import ChatMessage from './components/ChatMessage';
+import ChatInput from './components/ChatInput';
+import { Database, AlertCircle, CheckCircle2 } from 'lucide-react';
 import './App.css';
 
 function App() {
-  const { user, initData, colorScheme, themeParams } = useTelegramContext();
-  const [query, setQuery] = useState('');
-  const [response, setResponse] = useState<QueryResponse | null>(null);
-  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [databaseStatus, setDatabaseStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load history on mount
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (initData) {
-      loadHistory();
-    }
-  }, [initData]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
-  const loadHistory = async () => {
+  // Check database connection on mount
+  useEffect(() => {
+    checkDatabaseConnection();
+
+    // Add welcome message
+    const welcomeMessage: Message = {
+      id: 'welcome',
+      role: 'assistant',
+      content: 'Hello! I\'m your AI SQL Assistant. Ask me anything about your data in plain English, and I\'ll generate SQL queries and visualizations for you.',
+      timestamp: new Date(),
+    };
+    setMessages([welcomeMessage]);
+  }, []);
+
+  const checkDatabaseConnection = async () => {
     try {
-      const data = await telegramApi.getHistory(initData, 5);
-      setHistory(data);
-    } catch (err) {
-      console.error('Error loading history:', err);
+      setDatabaseStatus('checking');
+      await aiChatbotApi.testConnection(1); // Default database ID
+      setDatabaseStatus('connected');
+    } catch {
+      setDatabaseStatus('disconnected');
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim() || !initData) return;
+  const handleSendMessage = async (content: string) => {
+    // Add user message
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content,
+      timestamp: new Date(),
+    };
 
+    setMessages(prev => [...prev, userMessage]);
     setLoading(true);
     setError(null);
 
     try {
-      const result = await telegramApi.sendQuery(initData, query);
-      setResponse(result);
-      setQuery('');
-      loadHistory();
+      // Send query to AI backend
+      const response = await aiChatbotApi.sendQuery(content, 1);
+
+      // Create assistant message
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: 'assistant',
+        content: response.result,
+        timestamp: new Date(),
+        sql_query: response.sql_query,
+        visualization: response.visualization,
+        execution_time_ms: response.execution_time_ms,
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
     } catch (err) {
-      setError('Ошибка при отправке запроса');
-      console.error(err);
+      setError(err instanceof Error ? err.message : 'Failed to process your query');
+
+      // Add error message
+      const errorMessage: Message = {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: `Sorry, I encountered an error: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Apply Telegram theme
-  const appStyle = {
-    backgroundColor: themeParams.bg_color || (colorScheme === 'dark' ? '#1a1a1a' : '#ffffff'),
-    color: themeParams.text_color || (colorScheme === 'dark' ? '#ffffff' : '#000000'),
-    minHeight: '100vh',
-    padding: '20px',
-  };
-
-  const buttonStyle = {
-    backgroundColor: themeParams.button_color || '#0088cc',
-    color: themeParams.button_text_color || '#ffffff',
-  };
-
   return (
-    <div style={appStyle}>
-      <div className="container">
-        <h1>Telegram Mini App</h1>
-
-        {user && (
-          <div className="user-info">
-            <p>Привет, {user.first_name || user.username}!</p>
+    <div className="app">
+      {/* Header */}
+      <header className="app-header">
+        <div className="header-content">
+          <div className="header-title">
+            <Database size={24} />
+            <h1>AI SQL Chatbot</h1>
           </div>
-        )}
+          <div className={`database-status status-${databaseStatus}`}>
+            {databaseStatus === 'connected' ? (
+              <>
+                <CheckCircle2 size={16} />
+                <span>Connected</span>
+              </>
+            ) : databaseStatus === 'disconnected' ? (
+              <>
+                <AlertCircle size={16} />
+                <span>Disconnected</span>
+              </>
+            ) : (
+              <span>Checking...</span>
+            )}
+          </div>
+        </div>
+      </header>
 
-        <form onSubmit={handleSubmit} className="query-form">
-          <textarea
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Введите ваш запрос..."
-            rows={3}
-            disabled={loading}
-          />
-          <button
-            type="submit"
-            style={buttonStyle}
-            disabled={loading || !query.trim()}
-          >
-            {loading ? 'Отправка...' : 'Отправить'}
-          </button>
-        </form>
+      {/* Chat Container */}
+      <div className="chat-container">
+        <div className="messages-container">
+          {messages.map((message) => (
+            <ChatMessage key={message.id} message={message} />
+          ))}
+          {loading && (
+            <div className="typing-indicator">
+              <div className="typing-dot"></div>
+              <div className="typing-dot"></div>
+              <div className="typing-dot"></div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
+        {/* Error Display */}
         {error && (
-          <div className="error">
-            {error}
+          <div className="error-banner">
+            <AlertCircle size={16} />
+            <span>{error}</span>
           </div>
         )}
 
-        {response && (
-          <div className="response">
-            <h3>Ответ:</h3>
-            <p>{response.response}</p>
-          </div>
-        )}
-
-        {history.length > 0 && (
-          <div className="history">
-            <h3>История запросов:</h3>
-            {history.map((item) => (
-              <div key={item.id} className="history-item">
-                <strong>Q:</strong> {item.query}
-                <br />
-                <strong>A:</strong> {item.response}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Input */}
+        <ChatInput
+          onSend={handleSendMessage}
+          disabled={databaseStatus !== 'connected'}
+          loading={loading}
+        />
       </div>
+
+      {/* Suggested Queries */}
+      {messages.length === 1 && (
+        <div className="suggested-queries">
+          <h3>Try asking:</h3>
+          <div className="suggestions">
+            <button
+              onClick={() => handleSendMessage('How many transactions were made in Almaty?')}
+              className="suggestion-button"
+            >
+              How many transactions in Almaty?
+            </button>
+            <button
+              onClick={() => handleSendMessage('Show me top 10 cities by transaction count')}
+              className="suggestion-button"
+            >
+              Top 10 cities by transactions
+            </button>
+            <button
+              onClick={() => handleSendMessage('What is the distribution of transaction amounts?')}
+              className="suggestion-button"
+            >
+              Transaction amount distribution
+            </button>
+            <button
+              onClick={() => handleSendMessage('Show transactions over time')}
+              className="suggestion-button"
+            >
+              Transactions over time
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
