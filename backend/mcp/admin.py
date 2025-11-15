@@ -346,5 +346,5 @@ class TransactionAdmin(admin.ModelAdmin):
     )
     
     def has_add_permission(self, request):
-        """Disable manual addition via admin (use management command instead)."""
-        return False
+        """Allow manual addition of transactions via admin."""
+        return True
