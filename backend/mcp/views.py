@@ -5,8 +5,13 @@ from rest_framework.views import APIView
 from django.db.models import Avg, Count
 from django.utils import timezone
 from datetime import timedelta
+from datetime import datetime
 import time
 import traceback
+import pandas as pd
+import io
+from django.http import HttpResponse
+from urllib.parse import quote
 
 from langchain_community.utilities import SQLDatabase
 from langchain_community.tools.sql_database.tool import (
@@ -1021,3 +1026,141 @@ class MCPStatisticsView(APIView):
 
         serializer = MCPStatisticsSerializer(stats)
         return Response(serializer.data)
+
+
+# ============================================
+# Data Export
+# ============================================
+
+class ExportDataView(APIView):
+    """
+    Export SQL query results to CSV or Excel format
+    
+    POST /api/mcp/export/
+    {
+        "sql_query": "SELECT * FROM table",
+        "format": "csv" | "excel",
+        "database_id": 1,
+        "filename": "optional_custom_name"
+    }
+    """
+
+    def post(self, request):
+        """Export query results to CSV or Excel"""
+        sql_query = request.data.get("sql_query")
+        export_format = request.data.get("format", "csv").lower()
+        database_id = request.data.get("database_id")
+        filename = request.data.get("filename")
+
+        # Validation
+        if not sql_query:
+            return Response(
+                {"error": "sql_query is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if export_format not in ["csv", "excel", "xlsx"]:
+            return Response(
+                {"error": "format must be 'csv' or 'excel'"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not database_id:
+            return Response(
+                {"error": "database_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate SQL query (only SELECT statements)
+        sql_query_upper = sql_query.strip().upper()
+        if not sql_query_upper.startswith("SELECT"):
+            return Response(
+                {"error": "Only SELECT queries are allowed for export"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # Get database connection
+            try:
+                database = SQLDatabaseConnection.objects.get(
+                    id=database_id,
+                    is_active=True
+                )
+            except SQLDatabaseConnection.DoesNotExist:
+                return Response(
+                    {"error": f"Database with id {database_id} not found or inactive"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+            # Execute SQL query and get DataFrame
+            try:
+                df = pd.read_sql(sql_query, database.database_uri)
+            except Exception as e:
+                return Response(
+                    {"error": f"Failed to execute SQL query: {str(e)}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Check if DataFrame is empty
+            if df is None or df.empty:
+                return Response(
+                    {"error": "Query returned no results"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Limit result size for safety (max 100k rows)
+            MAX_ROWS = 100000
+            if len(df) > MAX_ROWS:
+                df = df.head(MAX_ROWS)
+                # Note: We could return a warning, but for simplicity, just truncate
+
+            # Generate filename if not provided
+            if not filename:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"query_results_{timestamp}"
+
+            # Export based on format
+            if export_format in ["excel", "xlsx"]:
+                # Excel export
+                try:
+                    output = io.BytesIO()
+                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                        df.to_excel(writer, sheet_name='Query Results', index=False)
+                    output.seek(0)
+
+                    excel_content = output.read()
+                    response = HttpResponse(
+                        excel_content,
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                    )
+                    # Use both filename and filename* for better browser compatibility
+                    safe_filename = quote(f"{filename}.xlsx")
+                    response['Content-Disposition'] = f'attachment; filename="{filename}.xlsx"; filename*=UTF-8\'\'{safe_filename}'
+                    response['Content-Length'] = str(len(excel_content))
+                    return response
+                except ImportError:
+                    return Response(
+                        {"error": "openpyxl is required for Excel export. Please install it: pip install openpyxl"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+            else:
+                # CSV export
+                output = io.StringIO()
+                df.to_csv(output, index=False, encoding='utf-8')
+                csv_content = output.getvalue()
+                
+                # Convert to bytes for proper content length
+                csv_bytes = csv_content.encode('utf-8')
+
+                response = HttpResponse(csv_bytes, content_type='text/csv; charset=utf-8')
+                # Use both filename and filename* for better browser compatibility
+                safe_filename = quote(f"{filename}.csv")
+                response['Content-Disposition'] = f'attachment; filename="{filename}.csv"; filename*=UTF-8\'\'{safe_filename}'
+                response['Content-Length'] = str(len(csv_bytes))
+                return response
+
+        except Exception as e:
+            return Response(
+                {"error": f"Export failed: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
