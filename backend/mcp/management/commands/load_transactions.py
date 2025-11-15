@@ -1,10 +1,3 @@
-"""
-Django management command to load transaction data from Parquet file into the database.
-
-Usage:
-    python manage.py load_transactions [--batch-size 10000] [--clear]
-"""
-
 import pandas as pd
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
