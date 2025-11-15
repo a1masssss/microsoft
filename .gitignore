@@ -2,5 +2,9 @@
 venv/
 __pycache__/
 .env
+<<<<<<< HEAD
 staticfiles/
 *.pyc
+=======
+backend/mcp/dataset/
+>>>>>>> a5fe2bdf520d977df9d5b6d2605148d2dec1572c
