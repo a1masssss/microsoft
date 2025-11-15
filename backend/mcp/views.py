@@ -898,6 +898,65 @@ class MCPRequestLogViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 # ============================================
+# AI Natural Language Query
+# ============================================
+
+class AIQueryView(APIView):
+    """
+    AI-powered natural language to SQL query endpoint
+
+    Uses OpenAI + LangChain SQL Agent to automatically:
+    1. Understand user's natural language query
+    2. Generate appropriate SQL query
+    3. Execute query on database
+    4. Return human-readable results
+
+    Example:
+    POST /api/mcp/ai-query/
+    {
+        "database_id": 1,
+        "query": "How many transactions were made in Almaty?"
+    }
+    """
+
+    def post(self, request):
+        """Process natural language query"""
+        from .ai_agent import process_natural_language_query
+
+        user_query = request.data.get("query")
+        database_id = request.data.get("database_id")
+
+        if not user_query:
+            return Response(
+                {"error": "query is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not database_id:
+            return Response(
+                {"error": "database_id is required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get session/user from headers
+        session_id = request.headers.get("X-Session-ID")
+        user_id = request.headers.get("X-User-ID")
+
+        # Process query with AI Agent
+        result = process_natural_language_query(
+            user_query=user_query,
+            database_id=database_id,
+            session_id=session_id,
+            user_id=user_id,
+        )
+
+        if result["success"]:
+            return Response(result)
+        else:
+            return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ============================================
 # Statistics and Analytics
 # ============================================
 

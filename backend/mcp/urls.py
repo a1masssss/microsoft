@@ -5,6 +5,7 @@ from .views import (
     DeepQueryView,
     QuickExploreView,
     QuickQueryView,
+    AIQueryView,
     MCPStatisticsView,
     SQLDatabaseConnectionViewSet,
     SQLToolExecutionViewSet,
@@ -26,6 +27,9 @@ router.register(r'logs', MCPRequestLogViewSet, basename='log')
 urlpatterns = [
     # MCP Protocol endpoint (JSON-RPC 2.0)
     path('protocol/', MCPProtocolView.as_view(), name='protocol'),
+
+    # AI Natural Language Query
+    path('ai-query/', AIQueryView.as_view(), name='ai-query'),
 
     # Deep Query (chain operations)
     path('deep-query/', DeepQueryView.as_view(), name='deep-query'),
