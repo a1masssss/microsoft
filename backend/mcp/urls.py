@@ -7,6 +7,7 @@ from .views import (
     QuickQueryView,
     AIQueryView,
     MCPStatisticsView,
+    ExportDataView,
     SQLDatabaseConnectionViewSet,
     SQLToolExecutionViewSet,
     MCPToolSchemaViewSet,
@@ -40,6 +41,9 @@ urlpatterns = [
 
     # Statistics
     path('statistics/', MCPStatisticsView.as_view(), name='statistics'),
+
+    # Export endpoint
+    path('export/', ExportDataView.as_view(), name='export'),
 
     # ViewSets (CRUD operations)
     path('', include(router.urls)),

@@ -99,4 +99,78 @@ export const aiChatbotApi = {
       throw error;
     }
   },
+
+  /**
+   * Export query results to CSV or Excel
+   * Returns both the blob and the filename extracted from headers
+   */
+  exportData: async (
+    sqlQuery: string,
+    format: 'csv' | 'excel',
+    databaseId: number = 1,
+    filename?: string
+  ): Promise<{ blob: Blob; filename: string }> => {
+    try {
+      const response = await api.post(
+        '/export/',
+        {
+          sql_query: sqlQuery,
+          format: format,
+          database_id: databaseId,
+          filename: filename,
+        },
+        {
+          responseType: 'blob', // Important for file downloads
+        }
+      );
+      
+      // Extract filename from Content-Disposition header
+      let extractedFilename = filename || `query_results_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}`;
+      const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+      
+      if (contentDisposition) {
+        // Try to extract from filename* (RFC 5987) first, then fallback to filename
+        const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (filenameStarMatch && filenameStarMatch[1]) {
+          try {
+            extractedFilename = decodeURIComponent(filenameStarMatch[1]);
+          } catch {
+            // If decoding fails, try regular filename
+            const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+            if (filenameMatch && filenameMatch[1]) {
+              extractedFilename = filenameMatch[1];
+            }
+          }
+        } else {
+          // Try regular filename
+          const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+          if (filenameMatch && filenameMatch[1]) {
+            extractedFilename = filenameMatch[1];
+          }
+        }
+      }
+      
+      // If no extension, add it based on format
+      if (!extractedFilename.endsWith('.csv') && !extractedFilename.endsWith('.xlsx')) {
+        extractedFilename += format === 'excel' ? '.xlsx' : '.csv';
+      }
+      
+      return {
+        blob: response.data,
+        filename: extractedFilename
+      };
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        // Try to parse error message from blob
+        try {
+          const errorText = await error.response.data.text();
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.error || 'Failed to export data');
+        } catch {
+          throw new Error('Failed to export data');
+        }
+      }
+      throw error;
+    }
+  },
 };
