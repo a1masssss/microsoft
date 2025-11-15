@@ -192,8 +192,8 @@ class SQLToolExecution(models.Model):
 
 class MCPRequestLog(models.Model):
     """
-    Detailed logging for MCP request flow
-    Legacy model - enhanced for better tracking
+    Model for logging MCP (Model Context Protocol) requests and responses.
+    Detailed logging for MCP request flow - enhanced for better tracking
     """
     # Link to MCP request/response
     mcp_request = models.ForeignKey(
@@ -203,16 +203,7 @@ class MCPRequestLog(models.Model):
         blank=True,
         null=True
     )
-=======
-
-class MCPRequestLog(models.Model):
-    """
-    Model for logging MCP (Model Context Protocol) requests and responses.
-    """
-    # Какая функция была вызвана (например: "list_tables", "select", "update")
-    function_name = models.CharField(max_length=255)
->>>>>>> a5fe2bdf520d977df9d5b6d2605148d2dec1572c
-
+    
     # Function/tool information
     function_name = models.CharField(max_length=255, help_text="Function or tool called")
     user_query = models.TextField(help_text="Original user query")
@@ -329,7 +320,7 @@ class MCPSession(models.Model):
 
     def __str__(self):
         return f"Session {self.session_id} - {self.user_id or 'Anonymous'}"
-=======
+
 class Transaction(models.Model):
     """
     Model representing financial transactions from the Parquet dataset.

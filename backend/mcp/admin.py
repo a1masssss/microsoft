@@ -1,5 +1,4 @@
 from django.contrib import admin
-<<<<<<< HEAD
 from unfold.admin import ModelAdmin, TabularInline
 from .models import (
     OpenAIMCPRequest,
@@ -9,6 +8,7 @@ from .models import (
     MCPRequestLog,
     MCPToolSchema,
     MCPSession,
+    Transaction
 )
 
 
@@ -246,8 +246,7 @@ class MCPSessionAdmin(ModelAdmin):
             'fields': ('created_at', 'last_activity', 'expires_at')
         }),
     )
-=======
-from .models import Transaction
+
 
 
 @admin.register(Transaction)
@@ -349,4 +348,3 @@ class TransactionAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         """Disable manual addition via admin (use management command instead)."""
         return False
->>>>>>> a5fe2bdf520d977df9d5b6d2605148d2dec1572c
