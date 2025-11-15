@@ -4,5 +4,7 @@ __pycache__/
 .env
 staticfiles/
 *.pyc
-backend/mcp/dataset/
+backend/mcp/dataset/example_dataset.parquet
+# Allow sample_100k.parquet to be committed
+!backend/mcp/dataset/sample_100k.parquet
 
