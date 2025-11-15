@@ -99,10 +99,6 @@ def reverse_load_data(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
-    dependencies = [
-        ('mcp', '0001_initial'),
-    ]
-
     operations = [
         migrations.RunPython(load_sample_data, reverse_load_data),
     ]

@@ -1,21 +1,8 @@
-from django.urls import path
-from .views import (
-    MCPProtocolView,
-    QuickExploreView,
-    QuickQueryView,
-    MCPStatisticsView,
-)
+from django.urls import path, re_path
+from .views import QueryTransactionsView
 
 app_name = 'mcp'
 
 urlpatterns = [
-    # MCP Protocol endpoint (JSON-RPC 2.0)
-    path('protocol/', MCPProtocolView.as_view(), name='protocol'),
-
-    # Quick Operations
-    path('quick/explore/', QuickExploreView.as_view(), name='quick-explore'),
-    path('quick/query/', QuickQueryView.as_view(), name='quick-query'),
-
-    # Statistics
-    path('statistics/', MCPStatisticsView.as_view(), name='statistics'),
+    re_path(r'^query-transactions/?$', QueryTransactionsView.as_view(), name='query-transactions'),
 ]

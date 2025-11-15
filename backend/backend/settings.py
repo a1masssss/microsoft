@@ -17,7 +17,6 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 DEBUG = True
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS').split(',')
-print(ALLOWED_HOSTS)
 
 # Application definition
 
@@ -169,6 +168,7 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 100,
+    'URL_FORMAT_OVERRIDE': None,  # Отключаем ?format= для выбора рендерера DRF
 }
 
 # drf-spectacular Configuration
