@@ -54,11 +54,11 @@ from .serializers import (
 def create_langchain_db(connection: SQLDatabaseConnection):
     """Create LangChain SQLDatabase from connection"""
     try:
+        # LangChain SQLDatabase only supports include_tables, not exclude_tables
         db = SQLDatabase.from_uri(
             connection.database_uri,
             sample_rows_in_table_info=connection.sample_rows_in_table_info,
             include_tables=connection.include_tables or None,
-            exclude_tables=connection.exclude_tables or None,
         )
         return db
     except Exception as e:
