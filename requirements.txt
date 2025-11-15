@@ -6,3 +6,7 @@ load-dotenv==0.1.0
 psycopg2==2.9.11
 python-dotenv==1.2.1
 sqlparse==0.5.3
+langchain-community
+langchain-core
+openai
+aiogram
