@@ -1,5 +1,7 @@
 import { motion } from 'framer-motion';
-import { CreditCard, Globe, Shield, Zap } from 'lucide-react';
+import { CreditCard, Globe, Shield, Zap, ArrowRight } from 'lucide-react';
+import { AnimatedShinyText } from '../components/ui/animated-shiny-text';
+import TestimonialSection from '../components/ui/testimonials';
 
 export const HomePage = () => {
   const features = [
@@ -36,10 +38,23 @@ export const HomePage = () => {
             className="text-center"
           >
             <div className="flex items-center justify-center mb-6">
-              <div className="w-16 h-16 rounded-full bg-white/20" />
-              <div className="w-16 h-16 rounded-full bg-white/30 -ml-8" />
+              <div className="w-16 h-16 rounded-full bg-mastercard-red" />
+              <div className="w-16 h-16 rounded-full bg-mastercard-orange -ml-8" />
             </div>
             <h1 className="text-4xl font-bold mb-4">Mastercard</h1>
+
+            {/* Animated Shiny Text */}
+            <div className="mb-6">
+              <div
+                className="group rounded-full border border-white/20 bg-white/10 text-base text-white transition-all ease-in hover:cursor-pointer hover:bg-white/20 inline-block"
+              >
+                <AnimatedShinyText className="inline-flex items-center justify-center px-4 py-1 transition ease-out hover:text-white/80 hover:duration-300 text-white">
+                  <span>✨ Цифровые платежи будущего</span>
+                  <ArrowRight className="ml-1 size-3 transition-transform duration-300 ease-in-out group-hover:translate-x-0.5" />
+                </AnimatedShinyText>
+              </div>
+            </div>
+
             <p className="text-xl text-white/90 max-w-2xl mx-auto">
               Бесценные возможности для вашего бизнеса и личных финансов
             </p>
@@ -70,6 +85,9 @@ export const HomePage = () => {
           })}
         </div>
       </section>
+
+      {/* Testimonial Section */}
+      <TestimonialSection />
 
       {/* About Section */}
       <section className="max-w-7xl mx-auto px-4 py-12">
