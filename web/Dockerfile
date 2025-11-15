@@ -5,12 +5,20 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-RUN npm install
+# Install dependencies
+RUN npm ci --only=production=false
 
-# Copy source files
-COPY . .
+# Copy only necessary source files (exclude node_modules, dist, etc.)
+COPY src ./src
+COPY public ./public
+COPY index.html ./
+COPY vite.config.ts ./
+COPY tsconfig*.json ./
+COPY postcss.config.js ./
+COPY eslint.config.js ./
 
-# Build the application
+# Build with increased memory limit
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 RUN npm run build
 
 # Production stage
