@@ -20,15 +20,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    ports:
-      - "3000:80"
     volumes:
-      - ./frontend:/app
       - ./frontend/dist:/app/dist
-    env_file:
-      - .env
-    depends_on:
-      - backend
 
   web:
     build:

@@ -5,7 +5,6 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-
 RUN npm install
 
 # Copy source files
@@ -17,16 +16,17 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
-# Install certbot for SSL certificate management
-RUN apk add certbot certbot-nginx
-
+# Copy built files to nginx
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Create directory for certbot webroot
 RUN mkdir -p /var/www/certbot
 
+# Copy nginx configuration (direct copy, no template substitution needed)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-COPY nginx.conf /etc/nginx/templates/default.conf.template
-
+# Expose ports
 EXPOSE 80 443
 
-CMD ["/bin/sh", "-c", "envsubst '$$DOMAIN_NAME' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+# Start nginx
+CMD ["nginx", "-g", "daemon off;"]
