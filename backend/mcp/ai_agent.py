@@ -91,14 +91,74 @@ class SQLAIAgent:
         )
 
         try:
-            # Execute agent
+            # Execute agent and capture SQL queries from tool calls
             logger.info(f"AI Agent processing query: {user_query}")
-            result = self.agent.invoke({"input": user_query})
-
+            
+            # Use stream to capture tool calls with SQL queries (for AgentExecutor)
+            sql_queries = []
+            final_output = None
+            
+            try:
+                # AgentExecutor.stream() returns chunks with actions and steps
+                for chunk in self.agent.stream({"input": user_query}):
+                    # Extract SQL from actions in each chunk
+                    if "actions" in chunk:
+                        for action in chunk["actions"]:
+                            if hasattr(action, "tool"):
+                                tool_name = action.tool
+                                # Capture SQL queries from sql_db_query tool (not checker)
+                                if tool_name == "sql_db_query":
+                                    if hasattr(action, "tool_input"):
+                                        tool_input = action.tool_input
+                                        if isinstance(tool_input, dict) and "query" in tool_input:
+                                            query = tool_input["query"]
+                                            if isinstance(query, str) and query.strip().upper().startswith("SELECT"):
+                                                sql_queries.append(query)
+                                                logger.info(f"Captured SQL query from stream: {query[:100]}...")
+                    
+                    # Also check steps (some chunks have steps instead of actions)
+                    if "steps" in chunk:
+                        for step in chunk["steps"]:
+                            if hasattr(step, "action"):
+                                action = step.action
+                                if hasattr(action, "tool") and action.tool == "sql_db_query":
+                                    if hasattr(action, "tool_input"):
+                                        tool_input = action.tool_input
+                                        if isinstance(tool_input, dict) and "query" in tool_input:
+                                            query = tool_input["query"]
+                                            if isinstance(query, str) and query.strip().upper().startswith("SELECT"):
+                                                sql_queries.append(query)
+                                                logger.info(f"Captured SQL query from stream steps: {query[:100]}...")
+                    
+                    # Keep track of final output
+                    if "output" in chunk:
+                        final_output = chunk["output"]
+                
+                # If we didn't get output from stream, use invoke
+                if final_output is None:
+                    result = self.agent.invoke({"input": user_query})
+                    final_output = result.get("output", "")
+            except Exception as stream_error:
+                # If streaming fails, fall back to invoke
+                logger.warning(f"Streaming failed, using invoke: {stream_error}")
+                result = self.agent.invoke({"input": user_query})
+                final_output = result.get("output", "")
+            
             execution_time = int((time.time() - start_time) * 1000)
 
-            # Extract SQL query from agent's intermediate steps if available
-            sql_query = self._extract_sql_query(result)
+            # Extract SQL query - use captured queries or fall back to extraction method
+            sql_query = None
+            if sql_queries:
+                sql_query = sql_queries[-1]  # Use the last SELECT query
+                logger.info(f"Using SQL query from stream: {sql_query[:100]}...")
+            else:
+                # Create a result dict for extraction method
+                result_dict = {"output": final_output} if final_output else {}
+                sql_query = self._extract_sql_query(result_dict, mcp_request)
+                if sql_query:
+                    logger.info(f"Extracted SQL query from fallback method: {sql_query[:100]}...")
+                else:
+                    logger.warning("No SQL query could be extracted from agent execution")
 
             # Generate visualization if applicable
             visualization = None
@@ -110,32 +170,44 @@ class SQLAIAgent:
 
                     if df is not None and not df.empty:
                         logger.info(f"DataFrame created with {len(df)} rows, {len(df.columns)} columns")
+                        logger.info(f"DataFrame columns: {list(df.columns)}")
+                        logger.info(f"DataFrame head:\n{df.head()}")
+                        
                         viz_generator = VisualizationGenerator()
-                        visualization = viz_generator.generate_visualization(
-                            df=df,
-                            query=user_query,
-                            sql_query=sql_query,
-                            config={}
-                        )
-                        if visualization:
-                            logger.info(f"Visualization generated: {visualization['chart_type']}")
+                        should_viz = viz_generator.should_visualize(user_query, sql_query, df)
+                        logger.info(f"Should visualize: {should_viz}")
+                        
+                        if should_viz:
+                            visualization = viz_generator.generate_visualization(
+                                df=df,
+                                query=user_query,
+                                sql_query=sql_query,
+                                config={}
+                            )
+                            if visualization:
+                                logger.info(f"Visualization generated successfully: {visualization.get('chart_type')}")
+                                logger.info(f"Visualization keys: {list(visualization.keys())}")
+                            else:
+                                logger.warning("Visualization generator returned None despite should_visualize=True")
                         else:
-                            logger.info("Visualization generator returned None (not suitable for viz)")
+                            logger.info("Visualization generator determined visualization not suitable")
                     else:
-                        logger.info(f"DataFrame is empty or None, skipping visualization")
+                        logger.warning(f"DataFrame is empty or None, skipping visualization")
                 except Exception as e:
                     logger.error(f"Error generating visualization: {e}", exc_info=True)
                     # Continue without visualization - text response is more important
+            else:
+                logger.warning("No SQL query available, skipping visualization generation")
 
             # Update tool execution
             tool_execution.tool_output = {
                 "user_query": user_query,
-                "result": result.get("output", ""),
-                "intermediate_steps": str(result.get("intermediate_steps", []))[:1000],
+                "result": final_output or "",
+                "intermediate_steps": str(sql_queries)[:1000],
                 "visualization_generated": visualization is not None,
             }
             tool_execution.sql_query = sql_query
-            tool_execution.query_result = {"output": result.get("output", "")}
+            tool_execution.query_result = {"output": final_output or ""}
             tool_execution.status = "success"
             tool_execution.execution_time_ms = execution_time
             tool_execution.save()
@@ -144,7 +216,7 @@ class SQLAIAgent:
                 "success": True,
                 "user_query": user_query,
                 "sql_query": sql_query,
-                "result": result.get("output", ""),
+                "result": final_output or "",
                 "execution_time_ms": execution_time,
                 "tool_execution_id": tool_execution.id,
             }
@@ -173,48 +245,75 @@ class SQLAIAgent:
                 "tool_execution_id": tool_execution.id,
             }
 
-    def _extract_sql_query(self, result: Dict) -> Optional[str]:
+    def _extract_sql_query(self, result: Dict, mcp_request: Optional[OpenAIMCPRequest] = None) -> Optional[str]:
         """
-        Extract SQL query from agent result
+        Extract SQL query from agent result using multiple methods
 
         Args:
             result: Agent execution result
-
+            mcp_request: Optional MCP request to query related SQLToolExecution records
         Returns:
             SQL query string or None
         """
         try:
-            # Try to extract from intermediate steps
-            intermediate_steps = result.get("intermediate_steps", [])
-
-            # Look for the actual data query (usually sql_db_query tool)
-            # We want the last SELECT query, not schema/list queries
             sql_queries = []
-
+            
+            # Method 1: Extract from messages in result (for openai-tools agent type)
+            if "messages" in result:
+                for message in result["messages"]:
+                    # Check if message has tool_calls
+                    if hasattr(message, "tool_calls") and message.tool_calls:
+                        for tool_call in message.tool_calls:
+                            tool_name = tool_call.get("name", "")
+                            tool_args = tool_call.get("args", {})
+                            
+                            if "sql" in tool_name.lower() and "query" in tool_name.lower():
+                                if isinstance(tool_args, dict) and "query" in tool_args:
+                                    query = tool_args["query"]
+                                    if isinstance(query, str) and query.strip().upper().startswith("SELECT"):
+                                        sql_queries.append(query)
+            
+            # Method 2: Try to extract from intermediate steps (for other agent types)
+            intermediate_steps = result.get("intermediate_steps", [])
             for step in intermediate_steps:
                 if len(step) >= 2:
                     action = step[0]
                     if hasattr(action, "tool"):
                         tool_name = action.tool
-                        # We only want actual data queries, not schema/list
                         if tool_name == "sql_db_query":
                             if hasattr(action, "tool_input"):
                                 tool_input = action.tool_input
                                 if isinstance(tool_input, dict) and "query" in tool_input:
                                     query = tool_input["query"]
-                                    # Only collect SELECT queries
                                     if query.strip().upper().startswith("SELECT"):
                                         sql_queries.append(query)
                                 elif isinstance(tool_input, str):
                                     if tool_input.strip().upper().startswith("SELECT"):
                                         sql_queries.append(tool_input)
 
-            # Return the last SELECT query (the actual data query)
+            # Method 3: Query SQLToolExecution records (fallback)
+            if not sql_queries and mcp_request:
+                from django.utils import timezone
+                from datetime import timedelta
+                
+                recent_executions = SQLToolExecution.objects.filter(
+                    mcp_request=mcp_request,
+                    sql_query__isnull=False,
+                    sql_query__startswith="SELECT",
+                    created_at__gte=timezone.now() - timedelta(minutes=1)
+                ).order_by('-created_at')
+                
+                if recent_executions.exists():
+                    sql_query = recent_executions.first().sql_query
+                    logger.info(f"Extracted SQL query from SQLToolExecution: {sql_query[:100]}...")
+                    return sql_query
+
+            # Return the last SELECT query if found
             if sql_queries:
                 logger.info(f"Extracted SQL query: {sql_queries[-1][:100]}...")
                 return sql_queries[-1]
 
-            logger.info("No SELECT query found in intermediate steps")
+            logger.info("No SELECT query found in any extraction method")
             return None
         except Exception as e:
             logger.error(f"Error extracting SQL query: {e}", exc_info=True)
