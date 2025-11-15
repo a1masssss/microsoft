@@ -777,6 +777,9 @@ class VisualizationGenerator:
             # Check if visualization is needed
             if not self.should_visualize(query, sql_query, df):
                 return None
+            
+            # Get data profile for enhanced analysis
+            profiler_results = self.data_profiler.analyze(df)
 
             # Get data profile for enhanced analysis
             profiler_results = self.data_profiler.analyze(df)
@@ -817,7 +820,7 @@ class VisualizationGenerator:
                 "metadata": metadata,
                 "insights": insights_text
             }
-
+            
         except Exception as e:
             logger.error(f"Error generating visualization: {e}", exc_info=True)
             return None
