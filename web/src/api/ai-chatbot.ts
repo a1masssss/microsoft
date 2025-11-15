@@ -26,6 +26,7 @@ export interface VisualizationData {
     original_rows?: number;
     sampled?: boolean;
     sample_size?: number;
+    correlation?: number;
   };
   config?: {
     title: string;
