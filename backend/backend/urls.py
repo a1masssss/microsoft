@@ -44,6 +44,7 @@ if settings.DEBUG:
     ]
 
 # Serve React frontend for Telegram Mini App (must be last!)
+# Only catch paths that don't start with 'admin' or 'api'
 urlpatterns += [
-    re_path(r'^.*$', TemplateView.as_view(template_name='index.html'), name='frontend'),
+    re_path(r'^(?!admin|api).*$', TemplateView.as_view(template_name='index.html'), name='frontend'),
 ]

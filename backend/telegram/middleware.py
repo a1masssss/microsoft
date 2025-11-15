@@ -32,6 +32,11 @@ class TelegramAuthMiddleware:
         # Get init_data from Authorization header
         auth_header = request.headers.get('Authorization', '')
 
+        # DEBUG: Log what we received
+        logger.info(f"Path: {request.path}")
+        logger.info(f"Authorization header: {auth_header[:50] if auth_header else 'EMPTY'}")
+        logger.info(f"All headers: {dict(request.headers)}")
+
         if not auth_header.startswith('tma '):
             return JsonResponse(
                 {'error': 'Missing or invalid Authorization header'},
