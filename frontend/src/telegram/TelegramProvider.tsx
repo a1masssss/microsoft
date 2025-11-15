@@ -1,7 +1,8 @@
 /**
  * Telegram context provider
  */
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext } from 'react';
+import type { ReactNode } from 'react';
 import { useTelegram } from './useTelegram';
 import type { WebApp, TelegramUser } from './types';
 
