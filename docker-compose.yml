@@ -49,17 +49,17 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./backend/Dockerfile
     container_name: django_backend
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app
+      - ./backend:/app/backend
       - ./backend/staticfiles:/app/staticfiles
       - ./backend/media:/app/media
-      - ./backend/mcp/dataset:/app/mcp/dataset
-      - ./frontend/dist:/app/dist
+      - ./backend/mcp/dataset:/app/backend/mcp/dataset
+      - ./frontend/dist:/app/frontend/dist
     env_file:
       - .env
     environment:

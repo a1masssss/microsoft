@@ -6,12 +6,10 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source files
 COPY . .
 
 # Build the application
 RUN npm run build
-
-# No CMD needed - just builds and exits, dist is in volume
