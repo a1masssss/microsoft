@@ -26,8 +26,8 @@ class ChatInteraction(models.Model):
     user = models.ForeignKey(TelegramUser, on_delete=models.CASCADE, related_name='interactions')
     message_text = models.TextField()
     response_text = models.TextField(null=True, blank=True)
-    query_generated = models.TextField(null=True, blank=True)  # SQL query if generated
-    query_result = models.JSONField(null=True, blank=True)  # Query result
+    query_generated = models.TextField(null=True, blank=True) 
+    query_result = models.JSONField(null=True, blank=True)  
     success = models.BooleanField(default=True)
     error_message = models.TextField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
