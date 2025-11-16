@@ -1,41 +1,33 @@
 import { useState, useRef } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
+import { Send, Loader2 } from 'lucide-react';
+
 /**
  * Chat Input Component
  * Text input for sending messages to the AI chatbot
  */
-import { useState, type KeyboardEvent } from 'react';
-import { Send, Loader2 } from 'lucide-react';
-
 interface ChatInputProps {
   onSend: (message: string) => void;
   isLoading: boolean;
   placeholder?: string;
 }
 
-export const ChatInput = ({ onSend, isLoading, placeholder = 'Задайте вопрос...' }: ChatInputProps) => {
+export const ChatInput = ({
+  onSend,
+  isLoading,
+  placeholder = 'Задайте вопрос...',
+}: ChatInputProps) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
-    if (message.trim() && !isLoading) {
-      onSend(message.trim());
-      setMessage('');
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
-  disabled?: boolean;
-  loading?: boolean;
-}
+    if (!message.trim() || isLoading) return;
 
-export default function ChatInput({ onSend, disabled, loading }: ChatInputProps) {
-  const [input, setInput] = useState('');
-
-  const handleSend = () => {
-    if (input.trim() && !disabled && !loading) {
-      onSend(input.trim());
-      setInput('');
+    onSend(message.trim());
+    setMessage('');
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
     }
   };
 
@@ -48,7 +40,7 @@ export default function ChatInput({ onSend, disabled, loading }: ChatInputProps)
 
   const handleInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
-    // Auto-resize textarea
+    // Auto-resize textarea but cap height to keep layout stable
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };
@@ -89,34 +81,3 @@ export default function ChatInput({ onSend, disabled, loading }: ChatInputProps)
     </div>
   );
 };
-  return (
-    <div className="chat-input-container">
-      <div className="chat-input-wrapper">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Ask a question about your data... (e.g., How many transactions in Almaty?)"
-          disabled={disabled || loading}
-          rows={1}
-          className="chat-input"
-        />
-        <button
-          onClick={handleSend}
-          disabled={!input.trim() || disabled || loading}
-          className="send-button"
-          aria-label="Send message"
-        >
-          {loading ? (
-            <Loader2 size={20} className="spinner" />
-          ) : (
-            <Send size={20} />
-          )}
-        </button>
-      </div>
-      <div className="input-hint">
-        Press Enter to send, Shift+Enter for new line
-      </div>
-    </div>
-  );
-}
