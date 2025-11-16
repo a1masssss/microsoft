@@ -58,6 +58,20 @@ export interface AIQueryResponse {
   error?: string;
 }
 
+export interface DatabaseExploreResponse {
+  database: {
+    id: number;
+    name: string;
+    type: string;
+  };
+  tables: string[];
+  table_count: number;
+  table_info?: string;
+  tables_queried?: string[];
+  total_execution_time_ms: number;
+  error?: string;
+}
+
 const api = axios.create({
   baseURL: `${API_BASE_URL}/api/mcp`,
   headers: {
@@ -130,6 +144,23 @@ export const aiChatbotApi = {
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
         throw new Error(error.response.data.error || 'Failed to transcribe audio');
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Explore database schema - get tables and structure
+   */
+  exploreDatabase: async (databaseId: number): Promise<DatabaseExploreResponse> => {
+    try {
+      const response = await api.post('/quick/explore/', {
+        database_id: databaseId,
+      });
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        throw new Error(error.response.data.error || 'Failed to explore database');
       }
       throw error;
     }

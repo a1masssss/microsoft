@@ -17,6 +17,7 @@ import DatabaseNode from './nodes/DatabaseNode';
 import type { DatabaseNodeData } from './nodes/DatabaseNode';
 import TableNode from './nodes/TableNode';
 import type { TableNodeData } from './nodes/TableNode';
+import { aiChatbotApi } from '@/api/ai-chatbot';
 
 const nodeTypes = {
   database: DatabaseNode,
@@ -62,14 +63,6 @@ type Column = {
   name: string;
   type: string;
   isPrimary?: boolean;
-};
-
-type DatabaseInfo = {
-  id: number;
-  name: string;
-  type: string;
-  tables: string[];
-  table_info?: string;
 };
 
 interface DatabaseMindMapProps {
@@ -126,27 +119,15 @@ export default function DatabaseMindMap({ databaseId, onError }: DatabaseMindMap
   const loadDatabaseSchema = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/mcp/quick/explore/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ database_id: databaseId }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch database schema');
-      }
-
-      const data: DatabaseInfo = await response.json();
+      const data = await aiChatbotApi.exploreDatabase(databaseId);
 
       // Create database root node
       const databaseNode: Node<DatabaseNodeData> = {
         id: 'db-root',
         type: 'database',
         data: {
-          name: data.name,
-          type: data.type,
+          name: data.database.name,
+          type: data.database.type,
           tableCount: data.tables.length,
         },
         position: { x: 0, y: 0 },
