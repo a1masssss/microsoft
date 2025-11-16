@@ -3,7 +3,10 @@
  */
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+// Use relative URL (empty string) when VITE_API_BASE_URL is not set
+// This works in production where nginx proxies /api/ to the backend
+// Only use absolute URL (like http://localhost:8000) when explicitly set for dev
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export interface DataPreview {
   columns: string[];
@@ -72,8 +75,12 @@ export interface DatabaseExploreResponse {
   error?: string;
 }
 
+// Construct baseURL: if empty, use relative path /api/mcp (works with nginx proxy)
+// If set, use absolute URL (e.g., http://localhost:8000/api/mcp for dev)
+const apiBaseURL = API_BASE_URL ? `${API_BASE_URL}/api/mcp` : '/api/mcp';
+
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/api/mcp`,
+  baseURL: apiBaseURL,
   headers: {
     'Content-Type': 'application/json',
   },
