@@ -13,8 +13,6 @@ function AppContent() {
       {currentPage === 'dashboard' && <Dashboard />}
       {currentPage === 'voice' && <Voice />}
       {currentPage === 'about' && <Dashboard />}
-      {currentPage === 'projects' && <Dashboard />}
-      {currentPage === 'resume' && <Dashboard />}
     </>
   )
 }
