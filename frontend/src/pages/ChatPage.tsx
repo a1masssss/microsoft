@@ -121,6 +121,13 @@ export const ChatPage = () => {
     }
   };
 
+  const handleVoiceResult = (transcript: string) => {
+    const cleaned = transcript.trim();
+    if (!cleaned || isLoading) return;
+    hapticFeedback('medium');
+    handleSendMessage(cleaned);
+  };
+
   return (
     <div className="flex h-screen flex-col bg-white">
       <section className="border-b border-gray-200 bg-white/95 backdrop-blur">
@@ -201,6 +208,11 @@ export const ChatPage = () => {
             name="message"
             placeholder="Напишите, что хотите узнать..."
             onKeyDown={handlePromptKeyDown}
+            onVoiceResult={handleVoiceResult}
+            onVoiceError={(message) => {
+              showAlert(message);
+              hapticFeedback('heavy');
+            }}
           />
         </form>
       </div>

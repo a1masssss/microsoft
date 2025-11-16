@@ -167,6 +167,9 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
 OPENAI_TEMPERATURE = float(os.getenv('OPENAI_TEMPERATURE', '0'))
 
+# Gemini Configuration
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+
 # LangChain Configuration
 LANGCHAIN_TRACING_V2 = os.getenv('LANGCHAIN_TRACING_V2', 'false').lower() == 'true'
 LANGCHAIN_API_KEY = os.getenv('LANGCHAIN_API_KEY', '')
