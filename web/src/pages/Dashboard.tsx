@@ -2,9 +2,10 @@ import { useState, useEffect } from "react"
 import { VercelV0Chat } from "@/components/ui/v0-ai-chat"
 import { NavBarDemo } from "@/components/NavBarDemo"
 import DatabaseMindMap from "@/components/mindmap/DatabaseMindMap"
+import { DeepQuery } from "@/components/DeepQuery"
 import { useNavigation } from "@/contexts/NavigationContext"
 
-type DashboardTab = 'chat' | 'mindmap';
+type DashboardTab = 'chat' | 'mindmap' | 'deepquery';
 
 export function Dashboard() {
     const { currentPage } = useNavigation();
@@ -41,6 +42,19 @@ export function Dashboard() {
                         )}
                     </button>
                     <button
+                        onClick={() => setActiveTab('deepquery')}
+                        className={`px-6 py-3 text-sm font-medium transition-colors relative ${
+                            activeTab === 'deepquery'
+                                ? 'text-white'
+                                : 'text-gray-400 hover:text-gray-300'
+                        }`}
+                    >
+                        Deep Query
+                        {activeTab === 'deepquery' && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
+                        )}
+                    </button>
+                    <button
                         onClick={() => setActiveTab('mindmap')}
                         className={`px-6 py-3 text-sm font-medium transition-colors relative ${
                             activeTab === 'mindmap'
@@ -59,6 +73,7 @@ export function Dashboard() {
             {/* Tab Content */}
             <div className="flex-1 overflow-hidden">
                 {activeTab === 'chat' && <VercelV0Chat />}
+                {activeTab === 'deepquery' && <DeepQuery databaseId={databaseId} />}
                 {activeTab === 'mindmap' && (
                     <div className="h-full flex flex-col bg-gray-50">
                         {/* Mind Map Header */}

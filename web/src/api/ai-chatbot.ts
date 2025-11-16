@@ -75,6 +75,46 @@ export interface DatabaseExploreResponse {
   error?: string;
 }
 
+export type DeepQueryOperation =
+  | { type: 'list_tables' }
+  | { type: 'table_info'; tables: string[] }
+  | { type: 'query'; sql: string };
+
+export interface DeepQueryRequest {
+  database_id: number;
+  operations: DeepQueryOperation[];
+}
+
+export interface DeepQueryResult {
+  operation: string;
+  index: number;
+  success: boolean;
+  error?: string;
+  skipped?: boolean;
+  result?: any;
+  tables?: string[];
+  count?: number;
+  tables_queried?: string[];
+  sql?: string;
+  execution_time_ms?: number;
+  tool_execution_id?: number;
+}
+
+export interface DeepQueryResponse {
+  database: {
+    id: number;
+    name: string;
+    type: string;
+  };
+  results: DeepQueryResult[];
+  total_operations: number;
+  executed_operations: number;
+  successful_operations: number;
+  failed_operations: number;
+  total_execution_time_ms: number;
+  all_successful: boolean;
+}
+
 // Construct baseURL: if empty, use relative path /api/mcp (works with nginx proxy)
 // If set, use absolute URL (e.g., http://localhost:8000/api/mcp for dev)
 const apiBaseURL = API_BASE_URL ? `${API_BASE_URL}/api/mcp` : '/api/mcp';
@@ -174,6 +214,21 @@ export const aiChatbotApi = {
   },
 
   /**
+   * Run deep query chain - execute multiple operations in sequence
+   */
+  runDeepQuery: async (request: DeepQueryRequest): Promise<DeepQueryResponse> => {
+    try {
+      const response = await api.post('/deep-query/', request);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        throw new Error(error.response.data.error || 'Failed to execute deep query');
+      }
+      throw error;
+    }
+  },
+
+  /**
    * Export query results to CSV or Excel
    * Returns both the blob and the filename extracted from headers
    */
@@ -196,11 +251,11 @@ export const aiChatbotApi = {
           responseType: 'blob', // Important for file downloads
         }
       );
-      
+
       // Extract filename from Content-Disposition header
       let extractedFilename = filename || `query_results_${new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-')}`;
       const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
-      
+
       if (contentDisposition) {
         // Try to extract from filename* (RFC 5987) first, then fallback to filename
         const filenameStarMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
@@ -222,12 +277,12 @@ export const aiChatbotApi = {
           }
         }
       }
-      
+
       // If no extension, add it based on format
       if (!extractedFilename.endsWith('.csv') && !extractedFilename.endsWith('.xlsx')) {
         extractedFilename += format === 'excel' ? '.xlsx' : '.csv';
       }
-      
+
       return {
         blob: response.data,
         filename: extractedFilename
