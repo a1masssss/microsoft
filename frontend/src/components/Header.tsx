@@ -1,4 +1,4 @@
-import { Home, MessageSquare, History, Layers, Mail } from 'lucide-react';
+import { Home, MessageSquare, History, Layers } from 'lucide-react';
 
 type Page = 'home' | 'chat' | 'history' | 'deep' | 'contacts';
 
@@ -13,7 +13,6 @@ export const Header = ({ currentPage, onNavigate }: HeaderProps) => {
     { id: 'chat' as Page, label: 'Чат', icon: MessageSquare },
     { id: 'history' as Page, label: 'История', icon: History },
     { id: 'deep' as Page, label: 'Deep Query', icon: Layers },
-    { id: 'contacts' as Page, label: 'Контакты', icon: Mail },
   ];
 
   return (

@@ -3,7 +3,6 @@ import { Header } from './components/Header';
 import { HomePage } from './pages/HomePage';
 import { ChatPage } from './pages/ChatPage';
 import { HistoryPage } from './pages/HistoryPage';
-import { ContactsPage } from './pages/ContactsPage';
 import { DeepQueryPage } from './pages/DeepQueryPage';
 import { useTelegram } from './hooks/useTelegram';
 
@@ -37,8 +36,6 @@ function App() {
         return <HistoryPage />;
       case 'deep':
         return <DeepQueryPage />;
-      case 'contacts':
-        return <ContactsPage />;
       default:
         return <HomePage />;
     }
