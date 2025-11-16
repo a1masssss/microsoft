@@ -60,6 +60,19 @@ echo "🔐 Requesting SSL certificates from Let's Encrypt..."
 echo "   Domain: $DOMAIN, www.$DOMAIN"
 echo "   Email: $EMAIL"
 echo ""
+echo "⏳ This may take 30-60 seconds while Let's Encrypt verifies your domain..."
+echo "   (Checking if http://$DOMAIN/.well-known/acme-challenge/ is accessible)"
+echo ""
+
+# Test ACME endpoint first
+echo "🧪 Quick test of ACME endpoint..."
+TEST_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" "http://$DOMAIN/.well-known/acme-challenge/test" 2>/dev/null || echo "000")
+if [ "$TEST_RESPONSE" = "404" ] || [ "$TEST_RESPONSE" = "000" ]; then
+    echo "   ⚠️  ACME endpoint test returned HTTP $TEST_RESPONSE (this might be OK)"
+else
+    echo "   ✅ ACME endpoint is accessible (HTTP $TEST_RESPONSE)"
+fi
+echo ""
 
 docker compose run --rm certbot certonly \
     --webroot \
@@ -70,7 +83,8 @@ docker compose run --rm certbot certonly \
     --non-interactive \
     -d "$DOMAIN" \
     -d "www.$DOMAIN" \
-    --verbose
+    --verbose \
+    2>&1 | tee /tmp/certbot-output.log
 
 CERT_EXIT_CODE=$?
 
