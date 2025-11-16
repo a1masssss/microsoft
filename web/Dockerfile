@@ -20,14 +20,11 @@ FROM nginx:alpine
 # Copy built files to nginx
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Create directory for certbot webroot
-RUN mkdir -p /var/www/certbot
-
-# Copy nginx configuration (direct copy, no template substitution needed)
+# Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose ports
-EXPOSE 80 443
+# Expose port
+EXPOSE 80
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]
