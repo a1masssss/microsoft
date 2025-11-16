@@ -16,7 +16,7 @@ export function HeroScrollDemo() {
         }
       >
         <img
-          src="https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1400&h=720&fit=crop"
+          src="/images/mastercard.jpeg"
           alt="hero"
           className="mx-auto rounded-2xl object-cover h-full w-full object-left-top"
           draggable={false}
