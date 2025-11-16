@@ -104,7 +104,7 @@ class SQLAIAgent:
             llm=llm,
             db=self.db,
             agent_type="openai-tools",  # Best for OpenAI models
-            verbose=False,  # Disable verbose for performance
+            verbose=True,  # Enable verbose logging to see agent steps
             handle_parsing_errors=True,
             max_iterations=6,  # Reduced from 10 to 6 (most queries need 3-4)
             max_execution_time=20,  # Reduced from 30 to 20 seconds

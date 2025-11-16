@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState } from 'react'
 
-type Page = 'home' | 'dashboard' | 'voice' | 'about' | 'projects' | 'resume'
+type Page = 'home' | 'dashboard' | 'voice' | 'mindmap' | 'about' | 'projects' | 'resume'
 
 interface NavigationContextType {
   currentPage: Page
