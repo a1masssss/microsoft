@@ -1,8 +1,8 @@
-import base64
 import logging
 import time
 import traceback
 import io
+import base64
 from datetime import timedelta, datetime
 import pandas as pd
 from django.conf import settings
@@ -11,9 +11,9 @@ from django.utils import timezone
 from django.http import HttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
-from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser
 from urllib.parse import quote
 
 from langchain_community.utilities import SQLDatabase
@@ -1239,9 +1239,24 @@ class ExportDataView(APIView):
             if export_format in ["excel", "xlsx"]:
                 # Excel export
                 try:
+                    # Check if openpyxl is available
+                    try:
+                        import openpyxl
+                    except ImportError:
+                        return Response(
+                            {"error": "openpyxl is required for Excel export. Please install it: pip install openpyxl"},
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                        )
+
+                    # Convert any datetime columns to string for Excel compatibility
+                    df_export = df.copy()
+                    for col in df_export.columns:
+                        if pd.api.types.is_datetime64_any_dtype(df_export[col]):
+                            df_export[col] = df_export[col].astype(str)
+
                     output = io.BytesIO()
                     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df.to_excel(writer, sheet_name='Query Results', index=False)
+                        df_export.to_excel(writer, sheet_name='Query Results', index=False)
                     output.seek(0)
 
                     excel_content = output.read()
@@ -1254,9 +1269,10 @@ class ExportDataView(APIView):
                     response['Content-Disposition'] = f'attachment; filename="{filename}.xlsx"; filename*=UTF-8\'\'{safe_filename}'
                     response['Content-Length'] = str(len(excel_content))
                     return response
-                except ImportError:
+                except Exception as excel_error:
+                    logger.error(f"Excel export error: {excel_error}", exc_info=True)
                     return Response(
-                        {"error": "openpyxl is required for Excel export. Please install it: pip install openpyxl"},
+                        {"error": f"Excel export failed: {str(excel_error)}"},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR
                     )
             else:
@@ -1276,7 +1292,9 @@ class ExportDataView(APIView):
                 return response
 
         except Exception as e:
+            logger.error(f"Export failed: {str(e)}", exc_info=True)
             return Response(
                 {"error": f"Export failed: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+

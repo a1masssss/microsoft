@@ -226,7 +226,26 @@ class SQLAIAgent:
 
                     if df is not None and not df.empty:
                         logger.debug(f"DataFrame: {len(df)} rows, {len(df.columns)} columns")
-                        
+
+                        # Store total row count
+                        total_rows = len(df)
+
+                        # Create data preview (first 20 rows) for frontend display
+                        preview_limit = 20
+                        df_preview = df.head(preview_limit)
+
+                        # Convert to JSON-serializable format
+                        preview_data = self._dataframe_to_json_serializable(df_preview)
+
+                        data_preview = {
+                            "columns": list(df.columns),
+                            "rows": preview_data,
+                            "total_rows": total_rows,
+                            "preview_rows": len(df_preview),
+                            "has_more": total_rows > preview_limit,
+                        }
+                        logger.debug(f"Created data preview: {len(preview_data)} rows")
+
                         # Create OpenAI client for AI-powered visualization features
                         openai_client = None
                         try:
@@ -525,3 +544,4 @@ def clear_agent_cache(database_id: Optional[int] = None):
             # Clear all cache
             _agent_cache.clear()
             logger.info("Cleared all agent cache")
+
