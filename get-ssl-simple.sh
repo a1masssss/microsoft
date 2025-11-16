@@ -8,9 +8,8 @@ EMAIL="admin@mythicai.me"
 echo "🔐 Getting SSL for $DOMAIN"
 echo ""
 
-# 1. Use HTTP config first
-echo "📝 Using HTTP config..."
-cp web/nginx-http.conf web/nginx.conf
+# 1. Ensure HTTP config is active (nginx.conf is already HTTP by default)
+echo "📝 Checking HTTP config..."
 docker compose restart web
 sleep 2
 
