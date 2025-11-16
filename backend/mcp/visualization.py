@@ -40,9 +40,12 @@ except ImportError:
 # Pydantic Models for Structured AI Outputs
 # ============================================================================
 
+VALID_CHART_TYPES = ["bar", "line", "pie", "scatter", "histogram", "heatmap", "box", "treemap", "table"]
+
+
 class ChartRecommendation(BaseModel):
     """AI-generated chart type recommendation"""
-    primary_chart_type: Literal["bar", "line", "pie", "scatter", "histogram", "heatmap", "box", "treemap"] = Field(
+    primary_chart_type: Literal["bar", "line", "pie", "scatter", "histogram", "heatmap", "box", "treemap", "table"] = Field(
         description="The recommended primary chart type"
     )
     confidence: float = Field(
@@ -52,7 +55,7 @@ class ChartRecommendation(BaseModel):
     reasoning: str = Field(
         description="Explanation of why this chart type was selected"
     )
-    alternative_charts: List[Literal["bar", "line", "pie", "scatter", "histogram", "heatmap", "box", "treemap"]] = Field(
+    alternative_charts: List[Literal["bar", "line", "pie", "scatter", "histogram", "heatmap", "box", "treemap", "table"]] = Field(
         default_factory=list,
         description="Alternative chart types that could also work"
     )
@@ -360,11 +363,14 @@ class IntelligentChartSelector:
             
             # Validate and clean alternative_charts
             if "alternative_charts" in result_dict:
-                valid_chart_types = ["bar", "line", "pie", "scatter", "histogram", "heatmap", "box", "treemap"]
                 result_dict["alternative_charts"] = [
                     chart for chart in result_dict["alternative_charts"]
-                    if chart in valid_chart_types
+                    if chart in VALID_CHART_TYPES
                 ]
+            
+            primary_type = result_dict.get("primary_chart_type")
+            if primary_type not in VALID_CHART_TYPES:
+                raise ValueError(f"Unsupported chart type from AI: {primary_type}")
             
             # Create recommendation object
             recommendation = ChartRecommendation(**result_dict)
@@ -404,7 +410,7 @@ class IntelligentChartSelector:
 
 Data: {json.dumps(data_summary)} | Sample: {json.dumps(sample_data[:2], default=str)[:200]}
 
-Return JSON: {{"primary_chart_type": "bar|line|pie|scatter|histogram|heatmap|box|treemap", "confidence": 0.0-1.0, "reasoning": "brief", "alternative_charts": [], "suggested_config": {{}}}}"""
+Return JSON: {{"primary_chart_type": "bar|line|pie|scatter|histogram|heatmap|box|treemap|table", "confidence": 0.0-1.0, "reasoning": "brief", "alternative_charts": [], "suggested_config": {{}}}}"""
         return prompt
     
     def _rule_based_recommendation(
@@ -570,7 +576,9 @@ Return JSON: {{"summary": "2-3 sentences", "key_findings": ["insight1", "insight
             if categorical_cols and numerical_cols:
                 top = df.loc[df[numerical_cols[0]].idxmax()]
                 findings.append(f"Highest value: {top[categorical_cols[0]]} with {top[numerical_cols[0]]:,.0f}")
-        
+        elif chart_type == "table":
+            findings.append("Data is displayed as a table for detailed inspection.")
+
         return DataInsights(
             summary=summary,
             key_findings=findings,
@@ -592,7 +600,7 @@ Consider:
 - Data volume and cardinality
 - Best practices for data visualization
 
-Available chart types: bar, line, pie, scatter, histogram, heatmap, box, treemap
+Available chart types: bar, line, pie, scatter, histogram, heatmap, box, treemap, table
 
 Return your recommendation as a JSON object with primary_chart_type, confidence (0-1), reasoning, alternative_charts, and suggested_config."""
 
@@ -842,6 +850,8 @@ class VisualizationGenerator:
                 return self._create_heatmap(df, config, profiler_results)
             elif chart_type == "box":
                 return self._create_boxplot(df, config, profiler_results)
+            elif chart_type == "table":
+                return self._create_table_chart(df, config)
             else:
                 return self._create_enhanced_bar_chart(df, config, profiler_results)
         except Exception as e:
@@ -1318,6 +1328,57 @@ class VisualizationGenerator:
 
         return fig, {"chart_type": "box"}
 
+    def _create_table_chart(
+        self,
+        df: pd.DataFrame,
+        config: Dict[str, Any]
+    ) -> Tuple[Optional[go.Figure], Dict[str, Any]]:
+        """Render data as an interactive table"""
+        if df is None or df.empty:
+            return None, {}
+
+        max_rows = 50
+        truncated = len(df) > max_rows
+        df_display = df.head(max_rows).copy()
+
+        header_values = [col.replace('_', ' ').title() for col in df_display.columns]
+        cell_values = [df_display[col].astype(str).tolist() for col in df_display.columns]
+
+        fig = go.Figure(
+            data=[
+                go.Table(
+                    header=dict(
+                        values=header_values,
+                        fill_color="#111827",
+                        font=dict(color="white", size=12),
+                        align="left"
+                    ),
+                    cells=dict(
+                        values=cell_values,
+                        fill_color="#F3F4F6",
+                        align="left"
+                    )
+                )
+            ]
+        )
+
+        fig.update_layout(
+            title=config.get("title", "Data Table"),
+            template="plotly_white",
+            height=min(700, 200 + len(df_display) * 18),
+            margin=dict(l=10, r=10, t=60, b=10)
+        )
+
+        metadata = {
+            "chart_type": "table",
+            "columns": list(df_display.columns),
+            "displayed_rows": len(df_display),
+            "total_rows": len(df),
+            "truncated": truncated
+        }
+
+        return fig, metadata
+
     def _generate_basic_insights(self, df: pd.DataFrame, chart_type: str, query: str) -> str:
         """Generate basic rule-based insights"""
         try:
@@ -1361,6 +1422,12 @@ class VisualizationGenerator:
                     top_value = df.loc[df[num_col].idxmax()]
                     percentage = (top_value[num_col] / total) * 100
                     insights.append(f"🥇 {top_value[cat_col]} accounts for {percentage:.1f}% of total")
+
+            elif chart_type == "table":
+                columns_preview = ", ".join([col.replace('_', ' ') for col in df.columns[:3]])
+                insights.append(f"📋 Табличный вид с колонками: {columns_preview}")
+                if len(df) > 50:
+                    insights.append(f"ℹ️ Показаны первые 50 строк из {len(df)}")
 
             return " • ".join(insights)
             

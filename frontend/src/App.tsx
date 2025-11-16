@@ -4,9 +4,10 @@ import { HomePage } from './pages/HomePage';
 import { ChatPage } from './pages/ChatPage';
 import { HistoryPage } from './pages/HistoryPage';
 import { ContactsPage } from './pages/ContactsPage';
+import { DeepQueryPage } from './pages/DeepQueryPage';
 import { useTelegram } from './hooks/useTelegram';
 
-type Page = 'home' | 'chat' | 'history' | 'contacts';
+type Page = 'home' | 'chat' | 'history' | 'deep' | 'contacts';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
@@ -17,8 +18,8 @@ function App() {
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-12 h-12 rounded-full bg-mastercard-red animate-pulse" />
-            <div className="w-12 h-12 rounded-full bg-mastercard-orange -ml-6 animate-pulse" />
+            <div className="w-12 h-12 rounded-full bg-gray-900 animate-pulse" />
+            <div className="w-12 h-12 rounded-full bg-gray-600 -ml-6 animate-pulse" />
           </div>
           <p className="text-gray-600">Загрузка...</p>
         </div>
@@ -34,6 +35,8 @@ function App() {
         return <ChatPage />;
       case 'history':
         return <HistoryPage />;
+      case 'deep':
+        return <DeepQueryPage />;
       case 'contacts':
         return <ContactsPage />;
       default:

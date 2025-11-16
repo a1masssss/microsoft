@@ -1,15 +1,20 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MessageSquare, Sparkles } from 'lucide-react';
+import {
+  MessageSquare,
+  Sparkles,
+} from 'lucide-react';
 import { ChatMessage } from '../components/ChatMessage';
-import { ChatInput } from '../components/ChatInput';
 import { aiService } from '../services/api';
 import { useTelegram } from '../hooks/useTelegram';
 import type { Message } from '../types';
+import AnimatedBackground from '../components/ui/animated-background';
+import { PromptBox } from '../components/ui/chatgpt-prompt-input';
 
 export const ChatPage = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [promptVersion, setPromptVersion] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { hapticFeedback, showAlert } = useTelegram();
 
@@ -77,74 +82,127 @@ export const ChatPage = () => {
     }
   };
 
+  const quickExamples = [
+    {
+      id: 'almaty',
+      title: 'Город Алматы',
+      description: 'Сколько транзакций обработано за неделю?',
+      prompt: 'Сколько транзакций было в Алматы за последнюю неделю?',
+    },
+    {
+      id: 'topClients',
+      title: 'Топ клиентов',
+      description: 'Кто лидирует по сумме покупок за месяц?',
+      prompt: 'Покажи топ 5 клиентов по сумме покупок за месяц',
+    },
+    {
+      id: 'avgCheck',
+      title: 'Средний чек',
+      description: 'Динамика среднего чека по городам',
+      prompt: 'Средний чек по городам за последний месяц',
+    },
+  ];
+
+  const handleFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const message = (formData.get('message') as string | null)?.trim();
+    if (!message || isLoading) return;
+    handleSendMessage(message);
+    setPromptVersion((prev) => prev + 1);
+    event.currentTarget.reset();
+  };
+
+  const handlePromptKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      const form = (event.target as HTMLTextAreaElement).form;
+      form?.requestSubmit();
+    }
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-mastercard-orange to-mastercard-red text-white p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-            <MessageSquare className="w-5 h-5" />
+    <div className="flex h-screen flex-col bg-white">
+      <section className="border-b border-gray-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6">
+          <div className="flex items-center gap-3">
+            <div className="rounded-2xl bg-gradient-to-r from-[#ff9966] to-[#ff5e62] p-3 shadow-sm">
+              <MessageSquare className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-widest text-gray-500">SQL Assistant</p>
+              <h1 className="text-2xl font-semibold text-gray-900">Чат аналитики</h1>
+            </div>
           </div>
-          <div>
-            <h1 className="font-semibold">SQL Assistant</h1>
-            <p className="text-xs text-white/80">AI-powered database queries</p>
-          </div>
+        </div>
+      </section>
+
+      <div className="flex-1 overflow-y-auto bg-gray-50">
+        <div className="mx-auto flex h-full w-full max-w-4xl flex-col gap-6 px-4 py-6">
+          {messages.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-3xl border border-gray-100 bg-white p-6 shadow-xl"
+            >
+              <div className="flex items-start gap-4">
+                <div className="rounded-2xl bg-gradient-to-r from-[#ff9966] to-[#ff5e62] p-3">
+                  <Sparkles className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">Задайте вопрос</h2>
+                  <p className="text-sm text-gray-600">
+                    Используйте естественный язык, чтобы получить SQL и ответы мгновенно.
+                  </p>
+                </div>
+              </div>
+              <div className="mt-6 grid gap-3">
+                <AnimatedBackground
+                  enableHover
+                  className="rounded-2xl bg-gradient-to-r from-[#ffede2] to-[#ffe7e0]"
+                  transition={{ type: 'spring', bounce: 0.2, duration: 0.3 }}
+                >
+                  {quickExamples.map((example) => (
+                    <button
+                      key={example.id}
+                      data-id={example.id}
+                      onClick={() => handleSendMessage(example.prompt)}
+                      className="w-full overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm transition-all hover:shadow-md data-[checked=true]:border-transparent data-[checked=true]:text-white"
+                    >
+                      <p className="text-sm font-semibold text-gray-900 data-[checked=true]:text-white">
+                        {example.title}
+                      </p>
+                      <p className="text-sm text-gray-500 data-[checked=true]:text-white/90">
+                        {example.description}
+                      </p>
+                    </button>
+                  ))}
+                </AnimatedBackground>
+              </div>
+            </motion.div>
+          ) : (
+            <>
+              {messages.map((message) => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
+              <div ref={messagesEndRef} />
+            </>
+          )}
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
-        {messages.length === 0 ? (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="h-full flex flex-col items-center justify-center text-center px-6"
-          >
-            <div className="w-16 h-16 rounded-full bg-gradient-to-r from-mastercard-orange to-mastercard-red flex items-center justify-center mb-4">
-              <Sparkles className="w-8 h-8 text-white" />
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Задайте вопрос</h2>
-            <p className="text-gray-600 max-w-md mb-6">
-              Используйте естественный язык для получения данных из базы
-            </p>
-
-            <div className="grid gap-2 w-full max-w-md">
-              {[
-                'Сколько транзакций было в Алматы?',
-                'Топ-5 клиентов по сумме покупок',
-                'Средний чек за последний месяц',
-              ].map((example, i) => (
-                <motion.button
-                  key={i}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => handleSendMessage(example)}
-                  className="bg-white border border-gray-200 rounded-xl px-4 py-3 text-left text-sm text-gray-700 hover:border-mastercard-orange hover:bg-orange-50 transition-all"
-                >
-                  {example}
-                </motion.button>
-              ))}
-            </div>
-          </motion.div>
-        ) : (
-          <>
-            {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
-
-      {/* Input */}
-      <div className="p-4 bg-white border-t border-gray-200">
-        <ChatInput
-          onSend={handleSendMessage}
-          isLoading={isLoading}
-          placeholder="Задайте вопрос..."
-        />
+      <div className="border-t border-gray-200 bg-white/90 backdrop-blur py-4 shadow-[0_-8px_30px_rgba(15,23,42,0.08)]">
+        <form
+          onSubmit={handleFormSubmit}
+          className="mx-auto w-full max-w-3xl px-4"
+          key={promptVersion}
+        >
+          <PromptBox
+            name="message"
+            placeholder="Напишите, что хотите узнать..."
+            onKeyDown={handlePromptKeyDown}
+          />
+        </form>
       </div>
     </div>
   );

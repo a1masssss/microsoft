@@ -1,6 +1,6 @@
-import { Home, MessageSquare, History, Mail } from 'lucide-react';
+import { Home, MessageSquare, History, Layers, Mail } from 'lucide-react';
 
-type Page = 'home' | 'chat' | 'history' | 'contacts';
+type Page = 'home' | 'chat' | 'history' | 'deep' | 'contacts';
 
 interface HeaderProps {
   currentPage: Page;
@@ -10,22 +10,23 @@ interface HeaderProps {
 export const Header = ({ currentPage, onNavigate }: HeaderProps) => {
   const navItems = [
     { id: 'home' as Page, label: 'Главная', icon: Home },
-    { id: 'chat' as Page, label: 'Chat', icon: MessageSquare },
+    { id: 'chat' as Page, label: 'Чат', icon: MessageSquare },
     { id: 'history' as Page, label: 'История', icon: History },
+    { id: 'deep' as Page, label: 'Deep Query', icon: Layers },
     { id: 'contacts' as Page, label: 'Контакты', icon: Mail },
   ];
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <header className="sticky top-0 z-50 border-b border-gray-200 bg-white">
       <div className="max-w-7xl mx-auto px-4">
         {/* Logo */}
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-2">
             <div className="flex items-center">
               <div className="w-8 h-8 rounded-full bg-mastercard-red" />
-              <div className="w-8 h-8 rounded-full bg-mastercard-orange -ml-4" />
+              <div className="w-8 h-8 rounded-full -ml-4 border border-white bg-mastercard-orange" />
             </div>
-            <span className="text-xl font-bold text-gray-900 ml-2">Mastercard</span>
+            <span className="ml-2 text-xl font-semibold text-gray-900">Mastercard</span>
           </div>
         </div>
 
@@ -39,13 +40,11 @@ export const Header = ({ currentPage, onNavigate }: HeaderProps) => {
               <button
                 key={item.id}
                 onClick={() => onNavigate(item.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-3 border-b-2 transition-colors whitespace-nowrap
-                  ${isActive
-                    ? 'border-mastercard-orange text-mastercard-orange font-medium'
-                    : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
-                  }
-                `}
+                className={`flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm transition-colors ${
+                  isActive
+                    ? 'border-gray-900 text-gray-900 font-medium'
+                    : 'border-transparent text-gray-500 hover:border-gray-200 hover:text-gray-900'
+                }`}
               >
                 <Icon className="w-4 h-4" />
                 <span className="text-sm">{item.label}</span>

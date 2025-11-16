@@ -41,15 +41,15 @@ export const HistoryPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-gradient-to-r from-mastercard-orange to-mastercard-red text-white p-4">
+      <div className="border-b border-gray-200 bg-white p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-              <Clock className="w-5 h-5" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gray-100">
+              <Clock className="w-5 h-5 text-gray-800" />
             </div>
             <div>
-              <h1 className="font-semibold">История запросов</h1>
-              <p className="text-xs text-white/80">Ваши предыдущие запросы</p>
+              <h1 className="font-semibold text-gray-900">История запросов</h1>
+              <p className="text-xs text-gray-500">Ваши предыдущие запросы</p>
             </div>
           </div>
 
@@ -57,7 +57,7 @@ export const HistoryPage = () => {
             whileTap={{ scale: 0.95 }}
             onClick={handleRefresh}
             disabled={isLoading}
-            className="p-2 rounded-lg bg-white/20 hover:bg-white/30 transition-colors disabled:opacity-50"
+            className="rounded-full border border-gray-200 p-2 text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50"
           >
             <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
           </motion.button>
@@ -68,7 +68,7 @@ export const HistoryPage = () => {
       <div className="px-4 py-6">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-mastercard-orange animate-spin" />
+            <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
           </div>
         ) : error ? (
           <motion.div
@@ -80,7 +80,7 @@ export const HistoryPage = () => {
             <motion.button
               whileTap={{ scale: 0.95 }}
               onClick={handleRefresh}
-              className="px-6 py-3 bg-gradient-to-r from-mastercard-orange to-mastercard-red text-white rounded-xl hover:shadow-lg transition-all"
+              className="px-6 py-3 rounded-xl border border-gray-200 bg-white text-gray-900 shadow-sm transition-all hover:shadow-md"
             >
               Попробовать снова
             </motion.button>

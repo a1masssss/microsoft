@@ -28,14 +28,14 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
       <div
         className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
           isUser
-            ? 'bg-gradient-to-r from-mastercard-orange to-mastercard-red'
-            : 'bg-gray-200'
+            ? 'bg-gradient-to-br from-[#ff9966] to-[#ff5e62] text-white shadow-md'
+            : 'bg-gray-100 text-gray-600'
         }`}
       >
         {isUser ? (
-          <User className="w-5 h-5 text-white" />
+          <User className="w-5 h-5" />
         ) : (
-          <Bot className="w-5 h-5 text-gray-600" />
+          <Bot className="w-5 h-5" />
         )}
       </div>
 
@@ -44,8 +44,8 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
         <div
           className={`rounded-2xl px-4 py-3 ${
             isUser
-              ? 'bg-gradient-to-r from-mastercard-orange to-mastercard-red text-white rounded-tr-sm'
-              : 'bg-white border border-gray-200 text-gray-900 rounded-tl-sm'
+              ? 'rounded-tr-sm bg-gradient-to-r from-[#ff9966] to-[#ff5e62] text-white shadow-lg'
+              : 'rounded-tl-sm border border-gray-200 bg-white text-gray-900 shadow-sm'
           }`}
         >
           {/* Loading animation */}
@@ -54,7 +54,9 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
               {[0, 1, 2].map((i) => (
                 <motion.div
                   key={i}
-                  className={`w-2 h-2 rounded-full ${isUser ? 'bg-white/50' : 'bg-mastercard-orange/50'}`}
+                  className={`w-2 h-2 rounded-full ${
+                    isUser ? 'bg-white/70' : 'bg-gray-400/70'
+                  }`}
                   animate={{
                     y: [0, -10, 0],
                   }}
@@ -86,7 +88,7 @@ export const ChatMessage = ({ message }: ChatMessageProps) => {
                       )}
                     </button>
                   </div>
-                  <pre className="text-xs font-mono text-mastercard-orange overflow-x-auto">
+                  <pre className="text-xs font-mono text-gray-800 overflow-x-auto">
                     {message.sql}
                   </pre>
                 </div>

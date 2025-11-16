@@ -1,21 +1,21 @@
+import logging
+import time
+import traceback
+import io
+from datetime import timedelta, datetime
+import pandas as pd
+from django.db.models import Avg, Count
+from django.utils import timezone
+from django.http import HttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from django.db.models import Avg, Count
-from django.utils import timezone
-from datetime import timedelta
-from datetime import datetime
-import time
-import traceback
-import pandas as pd
-import io
-from django.http import HttpResponse
 from urllib.parse import quote
 
 from langchain_community.utilities import SQLDatabase
 from langchain_community.tools.sql_database.tool import (
-    QuerySQLDataBaseTool,
+    QuerySQLDatabaseTool,
     InfoSQLDatabaseTool,
     ListSQLDatabaseTool,
 )
@@ -50,6 +50,10 @@ from .serializers import (
     MCPSessionListSerializer,
     MCPStatisticsSerializer,
 )
+from telegram.models import ChatInteraction
+from telegram.utils import get_telegram_user_from_request
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================
@@ -105,8 +109,8 @@ def execute_sql_tool(tool_name: str, db, tool_input: dict, connection: SQLDataba
         llm = get_llm_for_sql_toolkit()
 
         # Select and execute the appropriate tool
-        if tool_name == "QuerySQLDataBaseTool":
-            tool = QuerySQLDataBaseTool(db=db)
+        if tool_name in ("QuerySQLDataBaseTool", "QuerySQLDatabaseTool"):
+            tool = QuerySQLDatabaseTool(db=db)
             query = tool_input.get("query", "")
 
             # Basic validation
@@ -954,6 +958,31 @@ class AIQueryView(APIView):
             session_id=session_id,
             user_id=user_id,
         )
+
+        # Persist interaction for Telegram users so History tab can show recent queries
+        telegram_user = get_telegram_user_from_request(request)
+        if telegram_user:
+            try:
+                response_payload = result.get("result")
+                response_text = (
+                    response_payload if isinstance(response_payload, str) else None
+                ) or result.get("error") or ""
+
+                ChatInteraction.objects.create(
+                    user=telegram_user,
+                    message_text=user_query,
+                    response_text=response_text,
+                    query_generated=result.get("sql_query"),
+                    query_result=response_payload
+                    if isinstance(response_payload, (dict, list))
+                    else None,
+                    success=result.get("success", False),
+                    error_message=None if result.get("success") else result.get("error"),
+                )
+            except Exception as log_error:
+                logger.warning(
+                    "Failed to log Telegram history entry: %s", log_error, exc_info=True
+                )
 
         if result["success"]:
             return Response(result)
