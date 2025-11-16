@@ -11,10 +11,11 @@ import {
     MonitorIcon,
     ArrowUpIcon,
     Paperclip,
-    PlusIcon,
+    PanelRight,
 } from "lucide-react";
 import { aiChatbotApi, type Message } from "@/api/ai-chatbot";
-import { ChatMessage } from "@/components/chat/ChatMessage";
+import { ChatMessageSimple } from "@/components/chat/ChatMessageSimple";
+import { CanvasPanel } from "@/components/chat/CanvasPanel";
 
 interface UseAutoResizeTextareaProps {
     minHeight: number;
@@ -78,6 +79,8 @@ export function VercelV0Chat() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [databaseStatus, setDatabaseStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
+    const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+    const [showCanvas, setShowCanvas] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: 60,
@@ -144,6 +147,22 @@ export function VercelV0Chat() {
             };
 
             setMessages(prev => [...prev, assistantMessage]);
+            
+            // Auto-select and show canvas for the latest message if it has SQL/visualization
+            // This follows Gemini/Claude pattern: always switch to the latest canvas automatically
+            // Previous canvases can still be viewed by clicking on their messages
+            if (response.sql_query || response.visualization) {
+                // Always switch to the latest canvas (like Gemini does)
+                setSelectedMessage(assistantMessage);
+                setShowCanvas(true);
+                // Scroll to the new message after a brief delay to ensure it's rendered
+                setTimeout(() => {
+                    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            } else {
+                // If new message doesn't have canvas, keep the previous one visible
+                // User can still click on previous messages to view their canvases
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to process your query');
             
@@ -177,149 +196,183 @@ export function VercelV0Chat() {
     };
 
     return (
-        <div className="flex flex-col items-center w-full max-w-4xl mx-auto p-4 space-y-8">
-            <h1 className="text-4xl font-bold text-black dark:text-white">
-                What can I help you ship?
-            </h1>
-
-            {/* Chat Messages */}
-            {messages.length > 0 && (
-                <div className="w-full max-h-[60vh] overflow-y-auto space-y-4 px-4">
-                    {messages.map((message) => (
-                        <ChatMessage key={message.id} message={message} />
-                    ))}
-                    {loading && (
-                        <div className="flex items-center gap-2 text-neutral-400">
-                            <div className="flex gap-1">
-                                <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                                <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                                <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                            </div>
-                            <span className="text-sm">AI is thinking...</span>
+        <div className="flex flex-col h-screen w-full bg-black dark:bg-black">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-800">
+                <h1 className="text-2xl font-bold text-white">
+                    AI SQL Assistant
+                </h1>
+                <div className="flex items-center gap-3">
+                    {/* Toggle Canvas Button */}
+                    {selectedMessage && (selectedMessage.sql_query || selectedMessage.visualization) && (
+                        <button
+                            onClick={() => setShowCanvas(!showCanvas)}
+                            className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
+                            title={showCanvas ? "Hide canvas" : "Show canvas"}
+                        >
+                            <PanelRight size={18} className={cn(
+                                "text-neutral-400 transition-transform",
+                                showCanvas && "text-white"
+                            )} />
+                        </button>
+                    )}
+                    {databaseStatus !== 'checking' && (
+                        <div className={cn(
+                            "px-3 py-1 rounded-full text-xs font-medium",
+                            databaseStatus === 'connected' 
+                                ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                                : "bg-red-500/10 text-red-400 border border-red-500/20"
+                        )}>
+                            {databaseStatus === 'connected' ? '✓ Connected' : '✗ Disconnected'}
                         </div>
                     )}
-                    <div ref={messagesEndRef} />
                 </div>
-            )}
+            </div>
 
-            {/* Error Display */}
-            {error && (
-                <div className="w-full px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-                    {error}
-                </div>
-            )}
-
-            {/* Database Status */}
-            {databaseStatus !== 'checking' && (
-                <div className={cn(
-                    "px-3 py-1 rounded-full text-xs font-medium",
-                    databaseStatus === 'connected' 
-                        ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                        : "bg-red-500/10 text-red-400 border border-red-500/20"
-                )}>
-                    {databaseStatus === 'connected' ? '✓ Database Connected' : '✗ Database Disconnected'}
-                </div>
-            )}
-
-            <div className="w-full">
-                <div className="relative bg-neutral-900 rounded-xl border border-neutral-800">
-                    <div className="overflow-y-auto">
-                        <Textarea
-                            ref={textareaRef}
-                            value={value}
-                            onChange={(e) => {
-                                setValue(e.target.value);
-                                adjustHeight();
-                            }}
-                            onKeyDown={handleKeyDown}
-                            placeholder="Ask me anything about your data..."
-                            disabled={loading || databaseStatus !== 'connected'}
-                            className={cn(
-                                "w-full px-4 py-3",
-                                "resize-none",
-                                "bg-transparent",
-                                "border-none",
-                                "text-white text-sm",
-                                "focus:outline-none",
-                                "focus-visible:ring-0 focus-visible:ring-offset-0",
-                                "placeholder:text-neutral-500 placeholder:text-sm",
-                                "min-h-[60px]"
-                            )}
-                            style={{
-                                overflow: "hidden",
-                            }}
-                        />
+            {/* Main Content - Split Layout */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Left Panel - Chat */}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                    {/* Chat Messages */}
+                    <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+                        {messages.map((message) => (
+                            <ChatMessageSimple
+                                key={message.id}
+                                message={message}
+                                isSelected={selectedMessage?.id === message.id}
+                                hasCanvas={showCanvas && selectedMessage?.id === message.id}
+                                onSelect={() => {
+                                    if (message.sql_query || message.visualization) {
+                                        setSelectedMessage(message);
+                                        setShowCanvas(true);
+                                    }
+                                }}
+                            />
+                        ))}
+                        {loading && (
+                            <div className="flex items-center gap-2 text-neutral-400">
+                                <div className="flex gap-1">
+                                    <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                    <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                    <div className="w-2 h-2 bg-neutral-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                </div>
+                                <span className="text-sm">AI is thinking...</span>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
                     </div>
 
-                    <div className="flex items-center justify-between p-3">
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                className="group p-2 hover:bg-neutral-800 rounded-lg transition-colors flex items-center gap-1"
-                            >
-                                <Paperclip className="w-4 h-4 text-white" />
-                                <span className="text-xs text-zinc-400 hidden group-hover:inline transition-opacity">
-                                    Attach
-                                </span>
-                            </button>
+                    {/* Error Display */}
+                    {error && (
+                        <div className="mx-6 mb-4 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+                            {error}
                         </div>
+                    )}
 
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                className="px-2 py-1 rounded-lg text-sm text-zinc-400 transition-colors border border-dashed border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800 flex items-center justify-between gap-1"
-                            >
-                                <PlusIcon className="w-4 h-4" />
-                                Project
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleSubmit}
-                                disabled={!value.trim() || loading || databaseStatus !== 'connected'}
-                                className={cn(
-                                    "px-1.5 py-1.5 rounded-lg text-sm transition-colors border border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800 flex items-center justify-between gap-1 disabled:opacity-50 disabled:cursor-not-allowed",
-                                    value.trim() && !loading && databaseStatus === 'connected'
-                                        ? "bg-white text-black"
-                                        : "text-zinc-400"
-                                )}
-                            >
-                                <ArrowUpIcon
+                    {/* Input Area */}
+                    <div className="border-t border-neutral-800 p-4">
+                        <div className="relative bg-neutral-900 rounded-xl border border-neutral-800">
+                            <div className="overflow-y-auto">
+                                <Textarea
+                                    ref={textareaRef}
+                                    value={value}
+                                    onChange={(e) => {
+                                        setValue(e.target.value);
+                                        adjustHeight();
+                                    }}
+                                    onKeyDown={handleKeyDown}
+                                    placeholder="Ask me anything about your data..."
+                                    disabled={loading || databaseStatus !== 'connected'}
                                     className={cn(
-                                        "w-4 h-4",
-                                        value.trim() && !loading && databaseStatus === 'connected'
-                                            ? "text-black"
-                                            : "text-zinc-400"
+                                        "w-full px-4 py-3",
+                                        "resize-none",
+                                        "bg-transparent",
+                                        "border-none",
+                                        "text-white text-sm",
+                                        "focus:outline-none",
+                                        "focus-visible:ring-0 focus-visible:ring-offset-0",
+                                        "placeholder:text-neutral-500 placeholder:text-sm",
+                                        "min-h-[60px]"
                                     )}
+                                    style={{
+                                        overflow: "hidden",
+                                    }}
                                 />
-                                <span className="sr-only">Send</span>
-                            </button>
+                            </div>
+
+                            <div className="flex items-center justify-between p-3">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        className="group p-2 hover:bg-neutral-800 rounded-lg transition-colors flex items-center gap-1"
+                                    >
+                                        <Paperclip className="w-4 h-4 text-white" />
+                                        <span className="text-xs text-zinc-400 hidden group-hover:inline transition-opacity">
+                                            Attach
+                                        </span>
+                                    </button>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleSubmit}
+                                        disabled={!value.trim() || loading || databaseStatus !== 'connected'}
+                                        className={cn(
+                                            "px-1.5 py-1.5 rounded-lg text-sm transition-colors border border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800 flex items-center justify-between gap-1 disabled:opacity-50 disabled:cursor-not-allowed",
+                                            value.trim() && !loading && databaseStatus === 'connected'
+                                                ? "bg-white text-black"
+                                                : "text-zinc-400"
+                                        )}
+                                    >
+                                        <ArrowUpIcon
+                                            className={cn(
+                                                "w-4 h-4",
+                                                value.trim() && !loading && databaseStatus === 'connected'
+                                                    ? "text-black"
+                                                    : "text-zinc-400"
+                                            )}
+                                        />
+                                        <span className="sr-only">Send</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
+
+                        {/* Suggested Queries - Only show when no messages or just welcome */}
+                        {messages.length <= 1 && (
+                            <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
+                                <ActionButton
+                                    icon={<ImageIcon className="w-4 h-4" />}
+                                    label="How many transactions in Almaty?"
+                                    onClick={() => handleSendMessage('How many transactions were made in Almaty?')}
+                                />
+                                <ActionButton
+                                    icon={<Figma className="w-4 h-4" />}
+                                    label="Top 10 cities by transactions"
+                                    onClick={() => handleSendMessage('Show me top 10 cities by transaction count')}
+                                />
+                                <ActionButton
+                                    icon={<FileUp className="w-4 h-4" />}
+                                    label="Transaction distribution"
+                                    onClick={() => handleSendMessage('What is the distribution of transaction amounts?')}
+                                />
+                                <ActionButton
+                                    icon={<MonitorIcon className="w-4 h-4" />}
+                                    label="Transactions over time"
+                                    onClick={() => handleSendMessage('Show transactions over time')}
+                                />
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Suggested Queries - Only show when no messages or just welcome */}
-                {messages.length <= 1 && (
-                    <div className="flex items-center justify-center gap-3 mt-4 flex-wrap">
-                        <ActionButton
-                            icon={<ImageIcon className="w-4 h-4" />}
-                            label="How many transactions in Almaty?"
-                            onClick={() => handleSendMessage('How many transactions were made in Almaty?')}
-                        />
-                        <ActionButton
-                            icon={<Figma className="w-4 h-4" />}
-                            label="Top 10 cities by transactions"
-                            onClick={() => handleSendMessage('Show me top 10 cities by transaction count')}
-                        />
-                        <ActionButton
-                            icon={<FileUp className="w-4 h-4" />}
-                            label="Transaction distribution"
-                            onClick={() => handleSendMessage('What is the distribution of transaction amounts?')}
-                        />
-                        <ActionButton
-                            icon={<MonitorIcon className="w-4 h-4" />}
-                            label="Transactions over time"
-                            onClick={() => handleSendMessage('Show transactions over time')}
+                {/* Right Panel - Canvas (SQL + Visualization) */}
+                {showCanvas && selectedMessage && (
+                    <div className="w-[500px] lg:w-[600px] border-l border-neutral-800 flex-shrink-0 hidden md:flex flex-col animate-in slide-in-from-right duration-300">
+                        <CanvasPanel
+                            message={selectedMessage}
+                            onClose={() => setShowCanvas(false)}
                         />
                     </div>
                 )}

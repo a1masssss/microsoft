@@ -1,3 +1,6 @@
+/**
+ * Telegram context provider
+ */
 import { createContext, useContext, type ReactNode } from 'react';
 import { useTelegram } from './useTelegram';
 import type { WebApp, TelegramUser } from './types';

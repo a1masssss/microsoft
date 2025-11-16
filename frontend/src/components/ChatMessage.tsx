@@ -3,10 +3,6 @@ import { User, Bot, Copy, Check } from 'lucide-react';
 import { useState } from 'react';
 import type { Message } from '../types';
 
-/**
- * Chat Message Component
- * Displays individual messages in the chat with optional visualizations
- */
 interface ChatMessageProps {
   message: Message;
 }

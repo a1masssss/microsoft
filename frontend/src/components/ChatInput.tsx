@@ -3,10 +3,6 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 import { motion } from 'framer-motion';
 import { Send, Loader2 } from 'lucide-react';
 
-/**
- * Chat Input Component
- * Text input for sending messages to the AI chatbot
- */
 interface ChatInputProps {
   onSend: (message: string) => void;
   isLoading: boolean;
@@ -22,12 +18,12 @@ export const ChatInput = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSend = () => {
-    if (!message.trim() || isLoading) return;
-
-    onSend(message.trim());
-    setMessage('');
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+    if (message.trim() && !isLoading) {
+      onSend(message.trim());
+      setMessage('');
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto';
+      }
     }
   };
 

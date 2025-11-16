@@ -1,6 +1,7 @@
 """
 AI Agent for Natural Language to SQL using LangChain SQL Agent
 Processes user queries in natural language and executes SQL automatically
+Optimized for performance with caching and reduced iterations
 """
 
 from langchain_community.utilities import SQLDatabase
@@ -11,6 +12,7 @@ from typing import Dict, Any, Optional
 import time
 import logging
 import pandas as pd
+import threading
 
 from .models import SQLDatabaseConnection, SQLToolExecution, OpenAIMCPRequest
 from .utils import is_openai_configured
@@ -18,50 +20,94 @@ from .visualization import VisualizationGenerator
 
 logger = logging.getLogger(__name__)
 
+# Agent instance cache (thread-safe)
+_agent_cache = {}
+_cache_lock = threading.Lock()
+
 
 class SQLAIAgent:
-    """AI Agent for natural language SQL queries"""
+    """AI Agent for natural language SQL queries (optimized for performance)"""
 
-    def __init__(self, database_connection: SQLDatabaseConnection):
+    def __init__(self, database_connection: SQLDatabaseConnection, use_cache: bool = True):
         """
         Initialize AI Agent with database connection
 
         Args:
             database_connection: SQLDatabaseConnection instance
+            use_cache: Whether to use cached agent instance (default: True)
         """
         self.connection = database_connection
         self.db = None
         self.agent = None
+        self.use_cache = use_cache
+        
+        # Try to get cached agent first
+        if use_cache:
+            cache_key = f"{database_connection.id}_{database_connection.database_uri}"
+            with _cache_lock:
+                if cache_key in _agent_cache:
+                    cached = _agent_cache[cache_key]
+                    self.db = cached['db']
+                    self.agent = cached['agent']
+                    logger.debug(f"Using cached agent for database {database_connection.id}")
+                    return
+        
+        # Initialize new agent if not cached
         self._initialize_agent()
+        
+        # Cache the agent instance
+        if use_cache:
+            cache_key = f"{database_connection.id}_{database_connection.database_uri}"
+            with _cache_lock:
+                _agent_cache[cache_key] = {
+                    'db': self.db,
+                    'agent': self.agent,
+                    'timestamp': time.time()
+                }
+                logger.debug(f"Cached agent for database {database_connection.id}")
 
     def _initialize_agent(self):
-        """Initialize LangChain SQL Agent"""
+        """Initialize LangChain SQL Agent with optimized settings"""
         if not is_openai_configured():
             raise ValueError("OpenAI API key is not configured")
 
-        # Create SQLDatabase
+        # Create SQLDatabase with optimized settings
+        # Reduce sample_rows_in_table_info to speed up schema queries
+        sample_rows = min(self.connection.sample_rows_in_table_info or 3, 3)
+        
         self.db = SQLDatabase.from_uri(
             self.connection.database_uri,
-            sample_rows_in_table_info=self.connection.sample_rows_in_table_info,
+            sample_rows_in_table_info=sample_rows,  # Reduced from default
             include_tables=self.connection.include_tables or None,
         )
 
-        # Create OpenAI LLM
+        # Use faster model for SQL generation (gpt-4o-mini is sufficient and 2-3x faster)
+        # Override with gpt-4o-mini for speed unless explicitly set to something else
+        model_name = getattr(settings, 'OPENAI_MODEL', 'gpt-4o-mini')
+        if model_name not in ['gpt-4o-mini', 'gpt-4o']:
+            # If custom model, use it; otherwise default to mini for speed
+            model_name = model_name if model_name else 'gpt-4o-mini'
+        
+        # Create OpenAI LLM with optimized settings
         llm = ChatOpenAI(
-            model=settings.OPENAI_MODEL,
-            temperature=settings.OPENAI_TEMPERATURE,
+            model=model_name,
+            temperature=0.0,  # Lower temperature for more deterministic SQL (faster)
             api_key=settings.OPENAI_API_KEY,
+            timeout=15.0,  # Timeout for individual LLM calls
+            max_retries=1,  # Reduce retries for speed
         )
 
-        # Create SQL Agent
+        # Create SQL Agent with optimized parameters
+        # Note: create_sql_agent uses its own optimized prompt internally
+        # We optimize by reducing iterations and execution time
         self.agent = create_sql_agent(
             llm=llm,
             db=self.db,
             agent_type="openai-tools",  # Best for OpenAI models
-            verbose=True,
+            verbose=False,  # Disable verbose for performance
             handle_parsing_errors=True,
-            max_iterations=10,
-            max_execution_time=30,
+            max_iterations=6,  # Reduced from 10 to 6 (most queries need 3-4)
+            max_execution_time=20,  # Reduced from 30 to 20 seconds
         )
 
     def query(
@@ -70,7 +116,7 @@ class SQLAIAgent:
         mcp_request: Optional[OpenAIMCPRequest] = None
     ) -> Dict[str, Any]:
         """
-        Process natural language query and return results
+        Process natural language query and return results (optimized)
 
         Args:
             user_query: Natural language query from user
@@ -114,7 +160,7 @@ class SQLAIAgent:
                                             query = tool_input["query"]
                                             if isinstance(query, str) and query.strip().upper().startswith("SELECT"):
                                                 sql_queries.append(query)
-                                                logger.info(f"Captured SQL query from stream: {query[:100]}...")
+                                                logger.debug(f"Captured SQL query: {query[:100]}...")
                     
                     # Also check steps (some chunks have steps instead of actions)
                     if "steps" in chunk:
@@ -128,14 +174,20 @@ class SQLAIAgent:
                                             query = tool_input["query"]
                                             if isinstance(query, str) and query.strip().upper().startswith("SELECT"):
                                                 sql_queries.append(query)
-                                                logger.info(f"Captured SQL query from stream steps: {query[:100]}...")
+                                                logger.debug(f"Captured SQL query from steps: {query[:100]}...")
                     
                     # Keep track of final output
                     if "output" in chunk:
                         final_output = chunk["output"]
+                    elif "messages" in chunk and chunk["messages"]:
+                        # Check last message for output
+                        last_msg = chunk["messages"][-1]
+                        if hasattr(last_msg, "content") and last_msg.content:
+                            final_output = last_msg.content
                 
-                # If we didn't get output from stream, use invoke
+                # If we didn't get output from stream, use invoke (but with timeout)
                 if final_output is None:
+                    logger.debug("No output from stream, using invoke")
                     result = self.agent.invoke({"input": user_query})
                     final_output = result.get("output", "")
             except Exception as stream_error:
@@ -145,6 +197,7 @@ class SQLAIAgent:
                 final_output = result.get("output", "")
             
             execution_time = int((time.time() - start_time) * 1000)
+            logger.info(f"Agent execution completed in {execution_time}ms")
 
             # Extract SQL query - use captured queries or fall back to extraction method
             sql_query = None
@@ -160,22 +213,38 @@ class SQLAIAgent:
                 else:
                     logger.warning("No SQL query could be extracted from agent execution")
 
-            # Generate visualization if applicable
+            # Generate visualization if applicable (optimized - non-blocking)
             visualization = None
             if sql_query:  # Only if we have SQL query
                 try:
-                    logger.info(f"Attempting to generate visualization for SQL: {sql_query[:100]}...")
+                    logger.debug(f"Generating visualization for SQL: {sql_query[:100]}...")
                     # Execute SQL to get DataFrame for visualization
                     df = self._execute_sql_to_dataframe(sql_query)
 
                     if df is not None and not df.empty:
-                        logger.info(f"DataFrame created with {len(df)} rows, {len(df.columns)} columns")
-                        logger.info(f"DataFrame columns: {list(df.columns)}")
-                        logger.info(f"DataFrame head:\n{df.head()}")
+                        logger.debug(f"DataFrame: {len(df)} rows, {len(df.columns)} columns")
                         
-                        viz_generator = VisualizationGenerator()
+                        # Create OpenAI client for AI-powered visualization features
+                        openai_client = None
+                        try:
+                            from openai import OpenAI
+                            if hasattr(settings, 'OPENAI_API_KEY') and settings.OPENAI_API_KEY:
+                                # Use optimized timeout for visualization client
+                                try:
+                                    import httpx
+                                    timeout_config = httpx.Timeout(connect=2.0, read=5.0, write=2.0, pool=5.0)
+                                except ImportError:
+                                    timeout_config = 5.0
+                                
+                                openai_client = OpenAI(
+                                    api_key=settings.OPENAI_API_KEY,
+                                    timeout=timeout_config
+                                )
+                        except Exception as e:
+                            logger.debug(f"Could not initialize OpenAI client for visualization: {e}")
+                        
+                        viz_generator = VisualizationGenerator(openai_client=openai_client)
                         should_viz = viz_generator.should_visualize(user_query, sql_query, df)
-                        logger.info(f"Should visualize: {should_viz}")
                         
                         if should_viz:
                             visualization = viz_generator.generate_visualization(
@@ -185,19 +254,14 @@ class SQLAIAgent:
                                 config={}
                             )
                             if visualization:
-                                logger.info(f"Visualization generated successfully: {visualization.get('chart_type')}")
-                                logger.info(f"Visualization keys: {list(visualization.keys())}")
-                            else:
-                                logger.warning("Visualization generator returned None despite should_visualize=True")
+                                logger.debug(f"Visualization generated: {visualization.get('chart_type')}")
                         else:
-                            logger.info("Visualization generator determined visualization not suitable")
+                            logger.debug("Visualization not suitable for this query")
                     else:
-                        logger.warning(f"DataFrame is empty or None, skipping visualization")
+                        logger.debug("DataFrame is empty, skipping visualization")
                 except Exception as e:
-                    logger.error(f"Error generating visualization: {e}", exc_info=True)
+                    logger.warning(f"Error generating visualization: {e}", exc_info=True)
                     # Continue without visualization - text response is more important
-            else:
-                logger.warning("No SQL query available, skipping visualization generation")
 
             # Update tool execution
             tool_execution.tool_output = {
@@ -305,15 +369,15 @@ class SQLAIAgent:
                 
                 if recent_executions.exists():
                     sql_query = recent_executions.first().sql_query
-                    logger.info(f"Extracted SQL query from SQLToolExecution: {sql_query[:100]}...")
+                    logger.debug(f"Extracted SQL query from SQLToolExecution: {sql_query[:100]}...")
                     return sql_query
 
             # Return the last SELECT query if found
             if sql_queries:
-                logger.info(f"Extracted SQL query: {sql_queries[-1][:100]}...")
+                logger.debug(f"Extracted SQL query: {sql_queries[-1][:100]}...")
                 return sql_queries[-1]
 
-            logger.info("No SELECT query found in any extraction method")
+            logger.debug("No SELECT query found in any extraction method")
             return None
         except Exception as e:
             logger.error(f"Error extracting SQL query: {e}", exc_info=True)
@@ -350,7 +414,7 @@ def process_natural_language_query(
     user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Process natural language query using AI Agent
+    Process natural language query using AI Agent (optimized)
 
     Args:
         user_query: User's natural language query
@@ -376,8 +440,8 @@ def process_natural_language_query(
             raw_request={"user_query": user_query, "database_id": database_id},
         )
 
-        # Create and use AI Agent
-        agent = SQLAIAgent(connection)
+        # Create and use AI Agent (with caching enabled)
+        agent = SQLAIAgent(connection, use_cache=True)
         result = agent.query(user_query, mcp_request)
 
         return {
@@ -405,3 +469,24 @@ def process_natural_language_query(
             "success": False,
             "error": str(e),
         }
+
+
+def clear_agent_cache(database_id: Optional[int] = None):
+    """
+    Clear agent cache (useful for testing or when database schema changes)
+    
+    Args:
+        database_id: Optional database ID to clear specific cache entry
+    """
+    global _agent_cache
+    with _cache_lock:
+        if database_id:
+            # Clear specific database cache
+            keys_to_remove = [k for k in _agent_cache.keys() if k.startswith(f"{database_id}_")]
+            for key in keys_to_remove:
+                del _agent_cache[key]
+            logger.info(f"Cleared agent cache for database {database_id}")
+        else:
+            # Clear all cache
+            _agent_cache.clear()
+            logger.info("Cleared all agent cache")

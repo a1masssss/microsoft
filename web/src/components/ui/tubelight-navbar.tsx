@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { type LucideIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -20,7 +20,6 @@ interface NavBarProps {
 export function NavBar({ items, className }: NavBarProps) {
   const { navigateTo, currentPage } = useNavigation()
   const [activeTab, setActiveTab] = useState(items[0].name)
-  const [isMobile, setIsMobile] = useState(false)
 
   // Update active tab when page changes
   useEffect(() => {
@@ -29,16 +28,6 @@ export function NavBar({ items, className }: NavBarProps) {
       setActiveTab(activeItem.name)
     }
   }, [currentPage, items])
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768)
-    }
-
-    handleResize()
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
 
   return (
     <div
