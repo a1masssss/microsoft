@@ -8,8 +8,8 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy entire backend directory
-COPY backend/ .
+# Copy backend directory contents to /app
+COPY ./backend .
 
 # Note: frontend/dist will be mounted via volume at runtime
 # Collect static files (ignore errors if frontend not built yet)

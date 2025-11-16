@@ -52,10 +52,7 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./backend:/app/backend
-      - ./backend/staticfiles:/app/staticfiles
-      - ./backend/media:/app/media
-      - ./backend/mcp/dataset:/app/backend/mcp/dataset
+      - ./backend:/app
       - ./frontend/dist:/app/frontend/dist
     env_file:
       - .env
