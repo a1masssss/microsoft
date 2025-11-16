@@ -108,6 +108,46 @@ export function ChatMessage({ message }: ChatMessageProps) {
               </div>
             )}
 
+            {/* Data Preview Table */}
+            {message.data_preview && message.data_preview.rows.length > 0 && (
+              <div className="mt-3 bg-black/20 dark:bg-white/10 rounded-lg overflow-hidden">
+                <div className="px-3 py-2 bg-black/30 dark:bg-white/20">
+                  <span className="text-xs font-semibold">
+                    Showing {message.data_preview.preview_rows} of {message.data_preview.total_rows} rows
+                    {message.data_preview.has_more && (
+                      <span className="text-yellow-400 ml-2">(Use export buttons above to get all data)</span>
+                    )}
+                  </span>
+                </div>
+                <div className="overflow-x-auto max-h-96">
+                  <table className="w-full text-xs">
+                    <thead className="bg-black/40 dark:bg-white/10 sticky top-0">
+                      <tr>
+                        {message.data_preview.columns.map((col, idx) => (
+                          <th key={idx} className="px-3 py-2 text-left font-semibold border-b border-white/10">
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {message.data_preview.rows.map((row, rowIdx) => (
+                        <tr key={rowIdx} className="border-b border-white/5 hover:bg-white/5">
+                          {message.data_preview!.columns.map((col, colIdx) => (
+                            <td key={colIdx} className="px-3 py-2">
+                              {row[col] !== null && row[col] !== undefined
+                                ? String(row[col])
+                                : '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Visualization Display */}
             {message.visualization && message.visualization.enabled && (
               <div className="mt-3">

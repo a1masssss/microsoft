@@ -142,6 +142,7 @@ export function VercelV0Chat() {
                 content: response.result,
                 timestamp: new Date(),
                 sql_query: response.sql_query,
+                data_preview: response.data_preview,
                 visualization: response.visualization,
                 execution_time_ms: response.execution_time_ms,
             };

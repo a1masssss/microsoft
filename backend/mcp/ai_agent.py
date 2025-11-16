@@ -215,6 +215,9 @@ class SQLAIAgent:
 
             # Generate visualization if applicable (optimized - non-blocking)
             visualization = None
+            data_preview = None
+            total_rows = 0
+
             if sql_query:  # Only if we have SQL query
                 try:
                     logger.debug(f"Generating visualization for SQL: {sql_query[:100]}...")
@@ -284,7 +287,11 @@ class SQLAIAgent:
                 "execution_time_ms": execution_time,
                 "tool_execution_id": tool_execution.id,
             }
-            
+
+            # Add data preview if available
+            if data_preview:
+                response["data_preview"] = data_preview
+
             # Add visualization if available
             if visualization:
                 response["visualization"] = visualization
@@ -386,25 +393,53 @@ class SQLAIAgent:
     def _execute_sql_to_dataframe(self, sql_query: str) -> Optional[pd.DataFrame]:
         """
         Execute SQL query and return results as DataFrame
-        
+
         Args:
             sql_query: SQL query string
-            
+
         Returns:
             DataFrame with query results or None if error
         """
         try:
             if not sql_query or not sql_query.strip():
                 return None
-            
+
             # Use the database connection to execute SQL
             # SQLDatabase has a run method that returns string, but we need DataFrame
             # So we use pandas.read_sql directly with the database URI
             return pd.read_sql(sql_query, self.connection.database_uri)
-            
+
         except Exception as e:
             logger.warning(f"Could not execute SQL to DataFrame: {e}")
             return None
+
+    def _dataframe_to_json_serializable(self, df: pd.DataFrame) -> list:
+        """
+        Convert DataFrame to JSON-serializable list of dicts
+        Handles datetime and Decimal types
+
+        Args:
+            df: Pandas DataFrame
+
+        Returns:
+            List of dictionaries with JSON-serializable values
+        """
+        from decimal import Decimal
+        from datetime import datetime, date
+
+        records = df.to_dict('records')
+
+        # Convert non-serializable types
+        for record in records:
+            for key, value in record.items():
+                if isinstance(value, Decimal):
+                    record[key] = float(value)
+                elif isinstance(value, (datetime, date)):
+                    record[key] = value.isoformat()
+                elif pd.isna(value):
+                    record[key] = None
+
+        return records
 
 
 def process_natural_language_query(

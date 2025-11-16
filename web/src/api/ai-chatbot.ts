@@ -5,12 +5,21 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
+export interface DataPreview {
+  columns: string[];
+  rows: Record<string, any>[];
+  total_rows: number;
+  preview_rows: number;
+  has_more: boolean;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
   sql_query?: string;
+  data_preview?: DataPreview;
   visualization?: VisualizationData;
   execution_time_ms?: number;
 }
@@ -38,6 +47,7 @@ export interface AIQueryResponse {
   user_query: string;
   sql_query?: string;
   result: string;
+  data_preview?: DataPreview;
   execution_time_ms: number;
   visualization?: VisualizationData;
   database?: {
@@ -53,7 +63,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000, // 30 seconds for AI queries
+  timeout: 120000, // 120 seconds (2 minutes) for AI queries - increased for large datasets
 });
 
 export const aiChatbotApi = {

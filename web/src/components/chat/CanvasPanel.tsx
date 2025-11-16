@@ -126,6 +126,46 @@ export function CanvasPanel({ message, onClose }: CanvasPanelProps) {
           </div>
         )}
 
+        {/* Data Preview Table */}
+        {message.data_preview && message.data_preview.rows.length > 0 && (
+          <div className="bg-black/40 rounded-lg overflow-hidden border border-neutral-800">
+            <div className="px-3 py-2 bg-black/60 border-b border-neutral-800">
+              <span className="text-xs font-semibold text-neutral-300">
+                Showing {message.data_preview.preview_rows} of {message.data_preview.total_rows} rows
+                {message.data_preview.has_more && (
+                  <span className="text-yellow-400 ml-2">(Use export buttons above to get all data)</span>
+                )}
+              </span>
+            </div>
+            <div className="overflow-x-auto max-h-96">
+              <table className="w-full text-xs">
+                <thead className="bg-black/60 sticky top-0">
+                  <tr>
+                    {message.data_preview.columns.map((col, idx) => (
+                      <th key={idx} className="px-3 py-2 text-left font-semibold text-neutral-300 border-b border-neutral-700">
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {message.data_preview.rows.map((row, rowIdx) => (
+                    <tr key={rowIdx} className="border-b border-neutral-800 hover:bg-neutral-800/30 transition-colors">
+                      {message.data_preview!.columns.map((col, colIdx) => (
+                        <td key={colIdx} className="px-3 py-2 text-neutral-400">
+                          {row[col] !== null && row[col] !== undefined
+                            ? String(row[col])
+                            : '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Visualization */}
         {message.visualization && message.visualization.enabled && (
           <div className="space-y-2">
