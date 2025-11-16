@@ -5,18 +5,14 @@ WORKDIR /app
 # Copy requirements from root
 COPY requirements.txt .
 
-
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy backend project files
-COPY backend/backend/ ./backend/
-COPY backend/mcp/ ./mcp/
-COPY backend/telegram/ ./telegram/
-COPY backend/manage.py ./
+# Copy entire backend directory
+COPY backend/ .
 
 # Note: frontend/dist will be mounted via volume at runtime
-# Collect static files
+# Collect static files (ignore errors if frontend not built yet)
 RUN python manage.py collectstatic --noinput || true
 
 # Expose port
