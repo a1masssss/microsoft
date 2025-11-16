@@ -2,7 +2,9 @@ import * as React from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { voiceService } from '../../services/voice';
 
 const TooltipProvider = TooltipPrimitive.Provider;
 const Tooltip = TooltipPrimitive.Root;
@@ -318,10 +320,13 @@ const toolsList = [
   { id: 'thinkLonger', name: 'Think for longer', shortName: 'Think', icon: LightbulbIcon },
 ];
 
-export const PromptBox = React.forwardRef<
-  HTMLTextAreaElement,
-  React.TextareaHTMLAttributes<HTMLTextAreaElement>
->(({ className, ...props }, ref) => {
+interface PromptBoxProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  onVoiceResult?: (text: string) => void;
+  onVoiceError?: (message: string) => void;
+}
+
+export const PromptBox = React.forwardRef<HTMLTextAreaElement, PromptBoxProps>(
+  ({ className, onVoiceResult, onVoiceError, ...props }, ref) => {
   const internalTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [value, setValue] = React.useState('');
@@ -329,6 +334,11 @@ export const PromptBox = React.forwardRef<
   const [selectedTool, setSelectedTool] = React.useState<string | null>(null);
   const [isPopoverOpen, setIsPopoverOpen] = React.useState(false);
   const [isImageDialogOpen, setIsImageDialogOpen] = React.useState(false);
+  const mediaRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = React.useRef<MediaStream | null>(null);
+  const recordedChunksRef = React.useRef<Blob[]>([]);
+  const [isRecording, setIsRecording] = React.useState(false);
+  const [isTranscribing, setIsTranscribing] = React.useState(false);
 
   React.useImperativeHandle(ref, () => internalTextareaRef.current!, []);
 
@@ -340,6 +350,15 @@ export const PromptBox = React.forwardRef<
       textarea.style.height = `${newHeight}px`;
     }
   }, [value]);
+
+  React.useEffect(() => {
+    return () => {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setValue(e.target.value);
@@ -367,6 +386,87 @@ export const PromptBox = React.forwardRef<
     setImagePreview(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const stopMediaStream = () => {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+  };
+
+  const transcribeAudio = async (blob: Blob) => {
+    setIsTranscribing(true);
+    try {
+      const result = await voiceService.transcribe(blob);
+      const transcript = result?.transcript?.trim();
+      if (transcript) {
+        if (onVoiceResult) {
+          onVoiceResult(transcript);
+        } else {
+          setValue(transcript);
+        }
+      } else {
+        throw new Error('Не удалось распознать речь');
+      }
+    } catch (error: any) {
+      const message = error?.response?.data?.error || error?.message || 'Не удалось распознать речь';
+      onVoiceError?.(message);
+    } finally {
+      setIsTranscribing(false);
+      recordedChunksRef.current = [];
+    }
+  };
+
+  const startVoiceRecording = async () => {
+    if (isTranscribing) return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      onVoiceError?.('Браузер не поддерживает запись голоса');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      recordedChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        stopMediaStream();
+        setIsRecording(false);
+        if (recordedChunksRef.current.length === 0) {
+          onVoiceError?.('Запись не получилась, попробуйте ещё раз');
+          return;
+        }
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        transcribeAudio(blob);
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (error: any) {
+      onVoiceError?.('Нет доступа к микрофону');
+      stopMediaStream();
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleVoiceButtonClick = () => {
+    if (isRecording) {
+      stopVoiceRecording();
+    } else {
+      startVoiceRecording();
     }
   };
 
@@ -506,22 +606,37 @@ export const PromptBox = React.forwardRef<
             )}
 
             <div className="ml-auto flex items-center gap-2">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors hover:bg-accent focus-visible:outline-none dark:text-white dark:hover:bg-[#515151]"
-                  >
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleVoiceButtonClick}
+                  disabled={isTranscribing}
+                  className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-full text-foreground transition-colors focus-visible:outline-none dark:text-white',
+                    isRecording ? 'bg-red-100 text-red-600 hover:bg-red-200' : 'hover:bg-accent dark:hover:bg-[#515151]',
+                    isTranscribing && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  {isTranscribing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
                     <MicIcon className="h-5 w-5" />
-                    <span className="sr-only">Record voice</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="top" showArrow>
-                  <p>Record voice</p>
-                </TooltipContent>
-              </Tooltip>
+                  )}
+                  <span className="sr-only">Record voice</span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" showArrow>
+                <p>Record voice</p>
+              </TooltipContent>
+            </Tooltip>
+            {(isRecording || isTranscribing) && (
+              <span className="text-xs text-gray-500">
+                {isRecording ? 'Запись...' : 'Распознаём...'}
+              </span>
+            )}
 
-              <Tooltip>
+            <Tooltip>
                 <TooltipTrigger asChild>
                   <button
                     type="submit"

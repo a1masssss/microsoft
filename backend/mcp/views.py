@@ -1,14 +1,17 @@
+import base64
 import logging
 import time
 import traceback
 import io
 from datetime import timedelta, datetime
 import pandas as pd
+from django.conf import settings
 from django.db.models import Avg, Count
 from django.utils import timezone
 from django.http import HttpResponse
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from urllib.parse import quote
@@ -53,7 +56,27 @@ from .serializers import (
 from telegram.models import ChatInteraction
 from telegram.utils import get_telegram_user_from_request
 
+try:
+    from google import generativeai as genai
+except ImportError:  # pragma: no cover - handled via requirements
+    genai = None
+
 logger = logging.getLogger(__name__)
+_gemini_model = None
+
+
+def _get_gemini_model():
+    global _gemini_model
+    if not settings.GEMINI_API_KEY:
+        raise ValueError("Gemini API key is not configured")
+
+    if genai is None:
+        raise ValueError("google-generativeai package is not installed")
+
+    if _gemini_model is None:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        _gemini_model = genai.GenerativeModel("gemini-2.0-flash-exp")
+    return _gemini_model
 
 
 # ============================================
@@ -988,6 +1011,70 @@ class AIQueryView(APIView):
             return Response(result)
         else:
             return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AudioTranscriptionView(APIView):
+    """Upload audio and return Gemini transcription."""
+
+    parser_classes = (MultiPartParser, FormParser)
+
+    def post(self, request):
+        audio_file = request.FILES.get("audio")
+
+        if not audio_file:
+            return Response({"error": "audio file is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if audio_file.size > 6 * 1024 * 1024:  # ~6MB
+            return Response({"error": "Размер аудио слишком большой"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            model = _get_gemini_model()
+        except ValueError as e:
+            logger.error("Gemini configuration error: %s", e)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        try:
+            audio_bytes = audio_file.read()
+            mime_type = audio_file.content_type or "audio/webm"
+            audio_b64 = base64.b64encode(audio_bytes).decode("utf-8")
+
+            prompt = (
+                "Transcribe this audio input to natural text. "
+                "Return clean sentences in the detected language."
+            )
+
+            response = model.generate_content([
+                {"text": prompt},
+                {
+                    "inline_data": {
+                        "mime_type": mime_type,
+                        "data": audio_b64,
+                    }
+                },
+            ])
+
+            transcript = (response.text or "").strip()
+
+            if not transcript and response.candidates:
+                parts = response.candidates[0].content.parts
+                transcript = " ".join(getattr(part, "text", "") for part in parts).strip()
+
+            if not transcript:
+                raise ValueError("Gemini returned empty transcription")
+
+            return Response({
+                "success": True,
+                "transcript": transcript,
+                "mime_type": mime_type,
+                "duration_seconds": request.data.get("duration"),
+            })
+
+        except ValueError as e:
+            logger.warning("Transcription validation error: %s", e)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error("Gemini transcription failed: %s", e, exc_info=True)
+            return Response({"error": "Не удалось распознать аудио"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 # ============================================

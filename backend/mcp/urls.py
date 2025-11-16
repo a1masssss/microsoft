@@ -8,6 +8,7 @@ from .views import (
     AIQueryView,
     MCPStatisticsView,
     ExportDataView,
+    AudioTranscriptionView,
     SQLDatabaseConnectionViewSet,
     SQLToolExecutionViewSet,
     MCPToolSchemaViewSet,
@@ -44,6 +45,9 @@ urlpatterns = [
 
     # Export endpoint
     path('export/', ExportDataView.as_view(), name='export'),
+
+    # Voice transcription
+    path('transcribe/', AudioTranscriptionView.as_view(), name='transcribe'),
 
     # ViewSets (CRUD operations)
     path('', include(router.urls)),
