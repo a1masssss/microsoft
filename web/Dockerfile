@@ -2,6 +2,15 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Accept build arguments for Vite environment variables
+ARG VITE_API_BASE_URL
+ARG VITE_BASE_URL
+
+# Set environment variables for build
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
+ENV VITE_BASE_URL=${VITE_BASE_URL}
+ENV NODE_OPTIONS="--max-old-space-size=1536"
+
 # Copy package files
 COPY package*.json ./
 
@@ -11,7 +20,6 @@ RUN npm install
 COPY . .
 
 # Build the application with increased memory
-ENV NODE_OPTIONS="--max-old-space-size=1536"
 RUN npm run build
 
 # Production stage
