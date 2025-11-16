@@ -46,11 +46,15 @@ docker compose exec web nginx -t && docker compose exec web nginx -s reload || {
     exit 1
 }
 
-# Step 5: Delete old certificates if they exist and are invalid
+# Step 5: Stop the auto-renewal certbot container temporarily
+echo "⏸️  Stopping auto-renewal certbot container..."
+docker compose stop certbot 2>/dev/null || true
+
+# Step 6: Delete old certificates if they exist and are invalid
 echo "🗑️  Cleaning up old certificates (if any)..."
 docker compose run --rm certbot delete --cert-name $DOMAIN 2>/dev/null || true
 
-# Step 6: Get new certificates
+# Step 7: Get new certificates
 echo ""
 echo "🔐 Requesting SSL certificates from Let's Encrypt..."
 echo "   Domain: $DOMAIN, www.$DOMAIN"
@@ -68,12 +72,18 @@ docker compose run --rm certbot certonly \
     -d "www.$DOMAIN" \
     --verbose
 
-if [ $? -eq 0 ]; then
+CERT_EXIT_CODE=$?
+
+# Step 8: Restart auto-renewal certbot container
+echo "▶️  Restarting auto-renewal certbot container..."
+docker compose up -d certbot 2>/dev/null || true
+
+if [ $CERT_EXIT_CODE -eq 0 ]; then
     echo ""
     echo "✅ Certificates obtained successfully!"
     echo ""
     
-    # Step 7: Verify certificates exist
+    # Step 9: Verify certificates exist
     if docker compose exec web test -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem"; then
         echo "✅ Certificate files verified"
     else
@@ -81,12 +91,12 @@ if [ $? -eq 0 ]; then
         exit 1
     fi
     
-    # Step 8: Switch to SSL configuration
+    # Step 10: Switch to SSL configuration
     echo "🔄 Switching to HTTPS configuration..."
     cp web/nginx.conf web/nginx-http-backup.conf 2>/dev/null || true
     cp web/nginx-ssl.conf web/nginx.conf
     
-    # Step 9: Test nginx config and reload
+    # Step 11: Test nginx config and reload
     echo "🧪 Testing nginx SSL configuration..."
     docker compose exec web nginx -t || {
         echo "❌ Nginx SSL configuration is invalid!"
@@ -101,7 +111,7 @@ if [ $? -eq 0 ]; then
     
     sleep 3
     
-    # Step 10: Test HTTPS
+    # Step 12: Test HTTPS
     echo "🧪 Testing HTTPS..."
     HTTPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://$DOMAIN" || echo "000")
     if [ "$HTTPS_CODE" = "200" ] || [ "$HTTPS_CODE" = "301" ] || [ "$HTTPS_CODE" = "302" ]; then
@@ -121,6 +131,9 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "📝 Certificates will auto-renew every 12 hours"
 else
+    # Restart certbot even if failed
+    docker compose up -d certbot 2>/dev/null || true
+    
     echo ""
     echo "❌ Failed to obtain certificates!"
     echo ""
