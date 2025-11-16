@@ -7,68 +7,36 @@ import { useNavigation } from "@/contexts/NavigationContext"
 
 type DashboardTab = 'chat' | 'mindmap' | 'deepquery';
 
-export function Dashboard() {
+interface DashboardProps {
+    activeTab?: DashboardTab;
+}
+
+export function Dashboard({ activeTab: initialTab }: DashboardProps) {
     const { currentPage } = useNavigation();
-    const [activeTab, setActiveTab] = useState<DashboardTab>('chat');
+    const [activeTab, setActiveTab] = useState<DashboardTab>(initialTab || 'chat');
     const [databaseId, setDatabaseId] = useState(1);
 
-    // Switch to mindmap tab when navigated from Mind Map navbar item
+    // Update tab based on navigation
     useEffect(() => {
-        if (currentPage === 'mindmap') {
-            setActiveTab('mindmap');
-        } else if (currentPage === 'dashboard') {
+        if (currentPage === 'ai-sql-assistant') {
             setActiveTab('chat');
+        } else if (currentPage === 'deep-query') {
+            setActiveTab('deepquery');
+        } else if (currentPage === 'database-mind-map') {
+            setActiveTab('mindmap');
         }
     }, [currentPage]);
+
+    // Also update if prop changes
+    useEffect(() => {
+        if (initialTab) {
+            setActiveTab(initialTab);
+        }
+    }, [initialTab]);
 
     return (
         <div className="h-screen flex flex-col bg-black">
             <NavBarDemo />
-
-            {/* Tab Navigation */}
-            <div className="bg-black border-b border-gray-800">
-                <div className="flex gap-1 px-4">
-                    <button
-                        onClick={() => setActiveTab('chat')}
-                        className={`px-6 py-3 text-sm font-medium transition-colors relative ${
-                            activeTab === 'chat'
-                                ? 'text-white'
-                                : 'text-gray-400 hover:text-gray-300'
-                        }`}
-                    >
-                        AI SQL Assistant
-                        {activeTab === 'chat' && (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
-                        )}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('deepquery')}
-                        className={`px-6 py-3 text-sm font-medium transition-colors relative ${
-                            activeTab === 'deepquery'
-                                ? 'text-white'
-                                : 'text-gray-400 hover:text-gray-300'
-                        }`}
-                    >
-                        Deep Query
-                        {activeTab === 'deepquery' && (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
-                        )}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('mindmap')}
-                        className={`px-6 py-3 text-sm font-medium transition-colors relative ${
-                            activeTab === 'mindmap'
-                                ? 'text-white'
-                                : 'text-gray-400 hover:text-gray-300'
-                        }`}
-                    >
-                        Database Mind Map
-                        {activeTab === 'mindmap' && (
-                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />
-                        )}
-                    </button>
-                </div>
-            </div>
 
             {/* Tab Content */}
             <div className="flex-1 overflow-hidden">

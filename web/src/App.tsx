@@ -10,10 +10,10 @@ function AppContent() {
   return (
     <>
       {currentPage === 'home' && <Home />}
-      {currentPage === 'dashboard' && <Dashboard />}
+      {currentPage === 'ai-sql-assistant' && <Dashboard activeTab="chat" />}
+      {currentPage === 'deep-query' && <Dashboard activeTab="deepquery" />}
+      {currentPage === 'database-mind-map' && <Dashboard activeTab="mindmap" />}
       {currentPage === 'voice' && <Voice />}
-      {currentPage === 'mindmap' && <Dashboard />}
-      {currentPage === 'about' && <Dashboard />}
     </>
   )
 }
