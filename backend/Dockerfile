@@ -10,7 +10,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend project files
-COPY backend/ ./backend/
+COPY backend/backend/ ./backend/
+COPY backend/mcp/ ./mcp/
+COPY backend/telegram/ ./telegram/
 COPY backend/manage.py ./
 
 # Note: frontend/dist will be mounted via volume at runtime

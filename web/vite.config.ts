@@ -11,15 +11,17 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 1000,
+    // Optimize chunking to reduce memory usage
     rollupOptions: {
       output: {
         manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'plotly-vendor': ['plotly.js-dist'],
-          'spline-vendor': ['@splinetool/react-spline', '@splinetool/runtime'],
+          'vendor': ['react', 'react-dom'],
+          'spline': ['@splinetool/react-spline', '@splinetool/runtime'],
+          'motion': ['framer-motion'],
         },
       },
     },
+    // Increase chunk size warning limit
+    chunkSizeWarningLimit: 1000,
   },
 })
