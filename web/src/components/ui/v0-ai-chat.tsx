@@ -12,6 +12,8 @@ import {
     ArrowUpIcon,
     Paperclip,
     PanelRight,
+    Mic,
+    MicOff,
 } from "lucide-react";
 import { aiChatbotApi, type Message } from "@/api/ai-chatbot";
 import { ChatMessageSimple } from "@/components/chat/ChatMessageSimple";
@@ -81,6 +83,10 @@ export function VercelV0Chat() {
     const [databaseStatus, setDatabaseStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
     const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
     const [showCanvas, setShowCanvas] = useState(false);
+    const [isRecording, setIsRecording] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const { textareaRef, adjustHeight } = useAutoResizeTextarea({
         minHeight: 60,
@@ -193,6 +199,75 @@ export function VercelV0Chat() {
     const handleSubmit = () => {
         if (value.trim() && !loading && databaseStatus === 'connected') {
             handleSendMessage(value.trim());
+        }
+    };
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream, {
+                mimeType: 'audio/webm',
+            });
+            
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                await transcribeAudio(audioBlob);
+                
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+            setError(null);
+        } catch (err) {
+            setError('Failed to access microphone. Please check permissions.');
+            console.error('Error starting recording:', err);
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorderRef.current && isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        }
+    };
+
+    const transcribeAudio = async (audioBlob: Blob) => {
+        setIsTranscribing(true);
+        try {
+            const result = await aiChatbotApi.transcribeAudio(audioBlob);
+            
+            if (result.success && result.transcript) {
+                // Insert transcribed text into textarea
+                setValue(result.transcript);
+                adjustHeight();
+                // Focus the textarea
+                textareaRef.current?.focus();
+            } else {
+                setError(result.error || 'Failed to transcribe audio');
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to transcribe audio');
+        } finally {
+            setIsTranscribing(false);
+        }
+    };
+
+    const handleMicClick = () => {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
         }
     };
 
@@ -310,6 +385,29 @@ export function VercelV0Chat() {
                                         <Paperclip className="w-4 h-4 text-white" />
                                         <span className="text-xs text-zinc-400 hidden group-hover:inline transition-opacity">
                                             Attach
+                                        </span>
+                                    </button>
+                                    
+                                    <button
+                                        type="button"
+                                        onClick={handleMicClick}
+                                        disabled={loading || isTranscribing || databaseStatus !== 'connected'}
+                                        className={cn(
+                                            "group p-2 rounded-lg transition-all flex items-center gap-1",
+                                            isRecording
+                                                ? "bg-red-500/20 hover:bg-red-500/30 animate-pulse"
+                                                : "hover:bg-neutral-800",
+                                            "disabled:opacity-50 disabled:cursor-not-allowed"
+                                        )}
+                                        title={isRecording ? "Stop recording" : isTranscribing ? "Transcribing..." : "Start recording"}
+                                    >
+                                        {isRecording ? (
+                                            <MicOff className="w-4 h-4 text-red-400" />
+                                        ) : (
+                                            <Mic className={cn("w-4 h-4", isTranscribing ? "text-zinc-400" : "text-white")} />
+                                        )}
+                                        <span className="text-xs text-zinc-400 hidden group-hover:inline transition-opacity">
+                                            {isRecording ? "Stop" : isTranscribing ? "..." : "Voice"}
                                         </span>
                                     </button>
                                 </div>

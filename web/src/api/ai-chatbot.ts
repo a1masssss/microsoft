@@ -112,6 +112,30 @@ export const aiChatbotApi = {
   },
 
   /**
+   * Transcribe audio to text using Gemini
+   */
+  transcribeAudio: async (audioBlob: Blob): Promise<{ success: boolean; transcript: string; error?: string }> => {
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+
+      const response = await api.post('/transcribe/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 30000, // 30 seconds for transcription
+      });
+      
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        throw new Error(error.response.data.error || 'Failed to transcribe audio');
+      }
+      throw error;
+    }
+  },
+
+  /**
    * Export query results to CSV or Excel
    * Returns both the blob and the filename extracted from headers
    */
