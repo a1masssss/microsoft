@@ -9,7 +9,11 @@ interface ChatInputProps {
   placeholder?: string;
 }
 
-export const ChatInput = ({ onSend, isLoading, placeholder = 'Задайте вопрос...' }: ChatInputProps) => {
+export const ChatInput = ({
+  onSend,
+  isLoading,
+  placeholder = 'Задайте вопрос...',
+}: ChatInputProps) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -32,7 +36,7 @@ export const ChatInput = ({ onSend, isLoading, placeholder = 'Задайте в�
 
   const handleInput = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
-    // Auto-resize textarea
+    // Auto-resize textarea but cap height to keep layout stable
     e.target.style.height = 'auto';
     e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
   };

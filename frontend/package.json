@@ -10,8 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@radix-ui/react-avatar": "^1.1.2",
     "@twa-dev/sdk": "^7.10.1",
     "axios": "^1.7.9",
+    "clsx": "^2.1.1",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.553.0",
     "plotly.js": "^3.3.0",
