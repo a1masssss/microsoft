@@ -11,6 +11,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy backend directory contents to /app
 COPY ./backend .
 
+# Copy the compiled frontend bundle so Django can serve it. Make sure the frontend is built
+# before building the backend image.
+COPY ./frontend/dist ./frontend/dist
+
 # Note: frontend/dist will be mounted via volume at runtime
 # Collect static files (ignore errors if frontend not built yet)
 RUN python manage.py collectstatic --noinput || true

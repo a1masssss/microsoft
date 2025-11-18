@@ -17,9 +17,10 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include, re_path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
-from django.views.generic import TemplateView
 from django.conf import settings
 from django.views.static import serve
+
+from .views import FrontendAppView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -46,5 +47,5 @@ if settings.DEBUG:
 # Serve React frontend for Telegram Mini App (must be last!)
 # Only catch paths that don't start with 'admin' or 'api'
 urlpatterns += [
-    re_path(r'^(?!admin|api).*$', TemplateView.as_view(template_name='index.html'), name='frontend'),
+    re_path(r'^(?!admin|api).*$', FrontendAppView.as_view(), name='frontend'),
 ]

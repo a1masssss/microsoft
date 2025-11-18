@@ -138,6 +138,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Don't add dist to STATICFILES_DIRS, we'll serve it manually
 STATICFILES_DIRS = []
 
+# Frontend build locations
+FRONTEND_DIR = BASE_DIR.parent / 'frontend'
+FRONTEND_DIST_DIR = FRONTEND_DIR / 'dist'
+FRONTEND_INDEX_FILE = FRONTEND_DIST_DIR / 'index.html'
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
